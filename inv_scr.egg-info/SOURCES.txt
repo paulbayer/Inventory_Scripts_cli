@@ -1,0 +1,11 @@
+LICENSE
+README.md
+setup.py
+inv_scr/__init__.py
+inv_scr/__main__.py
+inv_scr.egg-info/PKG-INFO
+inv_scr.egg-info/SOURCES.txt
+inv_scr.egg-info/dependency_links.txt
+inv_scr.egg-info/entry_points.txt
+inv_scr.egg-info/requires.txt
+inv_scr.egg-info/top_level.txt
