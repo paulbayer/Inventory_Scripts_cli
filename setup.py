@@ -15,7 +15,7 @@ setup(
 		"boto3",  # Add all packages
 		"colorama",
 		"botocore",
-		"logging"
+		# "logging",
 		],
 	setup_requires=[],
 	tests_require=[],

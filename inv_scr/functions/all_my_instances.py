@@ -1,4 +1,4 @@
-def all_my_instances(pProfiles, pRegionList, verbose):
+def all_my_instances(fProfiles, fRegionList, fverbose):
 
 	import os
 	import sys
@@ -13,24 +13,13 @@ def all_my_instances(pProfiles, pRegionList, verbose):
 
 	init()
 
-	parser = CommonArguments()
-	parser.multiprofile()
-	parser.multiregion()
-	parser.verbosity()
-	args = parser.my_parser.parse_args()
-
-	pProfiles = args.Profiles
-	pRegionList = args.Regions
-	verbose = args.loglevel
-	logging.basicConfig(level=verbose, format="[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s")
+	logging.basicConfig(level=fverbose, format="[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s")
 
 	##################
 
-
 	ERASE_LINE = '\x1b[2K'
 
-	logging.info(f"Profiles: {pProfiles}")
-
+	logging.info(f"Profiles: {fProfiles}")
 
 	##################
 	def check_accounts_for_instances(faws_acct, fRegionList=None):
@@ -95,9 +84,7 @@ def all_my_instances(pProfiles, pRegionList, verbose):
 			AllInstances.extend(Instances['Reservations'])
 		return (AllInstances)
 
-
 	##################
-
 
 	print()
 	print(f"Checking for instances... ")
@@ -111,22 +98,22 @@ def all_my_instances(pProfiles, pRegionList, verbose):
 	InstancesFound = []
 	AllChildAccounts = []
 
-	if pProfiles is None:  # Default use case from the classes
+	if fProfiles is None:  # Default use case from the classes
 		logging.info("Using whatever the default profile is")
 		aws_acct = aws_acct_access()
-		RegionList = Inventory_Modules.get_regions3(aws_acct, pRegionList)
+		RegionList = Inventory_Modules.get_regions3(aws_acct, fRegionList)
 		logging.warning(f"Default profile will be used")
 		InstancesFound.extend(check_accounts_for_instances(aws_acct, RegionList))
 		AllChildAccounts.extend(aws_acct.ChildAccounts)
 	else:
 		logging.info("The following profiles are being checked.")
-		ProfileList = Inventory_Modules.get_profiles(fprofiles=pProfiles)
-		logging.info(pProfiles)
+		ProfileList = Inventory_Modules.get_profiles(fprofiles=fProfiles)
+		logging.info(fProfiles)
 		logging.warning("All available profiles will be shown")
 		for profile in ProfileList:
 			aws_acct = aws_acct_access(profile)
 			logging.info(f"Looking at {profile} account now... ")
-			RegionList = Inventory_Modules.get_regions3(aws_acct, pRegionList)
+			RegionList = Inventory_Modules.get_regions3(aws_acct, fRegionList)
 			InstancesFound.extend(check_accounts_for_instances(aws_acct, RegionList))
 			AllChildAccounts.extend(aws_acct.ChildAccounts)
 

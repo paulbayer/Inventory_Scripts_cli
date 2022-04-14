@@ -16,7 +16,7 @@ operation = args.operation
 
 def main(arguments):
 	if operation in ['instances', 'instance', ]:
-		all_my_instances(, kwargs['Regions'], kwargs['verbose'])
+		all_my_instances(arguments.Profiles, arguments.Regions)
 	else:
 		print("Goodbye")
 	# if True:  # Logic for functions
@@ -24,8 +24,12 @@ def main(arguments):
 
 
 if __name__ == '__main__':
+	"""
 	Profiles = args.Profiles
 	Regions = args.Regions
 	verbose = args.loglevel
+	"""
 	logging.basicConfig(level=args.loglevel, format="[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s")
+	logging.debug(args)
+	print(args)
 	main(args)
