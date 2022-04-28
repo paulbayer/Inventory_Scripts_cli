@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
 	name='inv_scr',  # Update Name
 	packages=['inv_scr'],  # Name of CLI
-	version='0.1.0',  # Version
+	version='0.1.3',  # Version
 	description='A cli for Inventory Scripts',  # Description
 	author='Paul Bayer',  # Author
 	url='https://gitlab.aws.dev/paulbaye/inventory_scripts_cli',  # To be updated

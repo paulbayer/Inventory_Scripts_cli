@@ -82,7 +82,7 @@ class CommonArguments():
 		# 	action="store_false",
 		# 	dest="DryRun")              # Default to Dry Run (no changes)
 		self.my_parser.add_argument(
-			"--force", "+force",
+			"+force",
 			help="To force a change - despite indications to the contrary",
 			action="store_true",
 			dest="Force")  # Default to Dry Run (no changes)
@@ -94,10 +94,18 @@ class CommonArguments():
 			default=[],
 			help="These are the account numbers you don't want to screw with. Likely the core accounts.")
 
-	def fragment(self):
+	def orgwide(self):
+		self.my_parser.add_argument(
+			"-o", "--org", "--organization",
+			dest="org_wide",
+			default=False,
+			action="store_true",
+			help="Whether this operation should be run for the whole organization or just the single account.")
+
+	def multifragment(self):
 		self.my_parser.add_argument(
 			"-f", "--fragment",
-			dest="Fragment",
+			dest="Fragments",
 			nargs='*',
 			metavar="CloudFormation stack fragment",
 			default=["all"],
@@ -105,43 +113,43 @@ class CommonArguments():
 
 	def singleprofile(self):
 		self.my_parser.add_argument(
-				"-p", "--profile",
-				dest="Profile",
-				metavar="Profile",
-				default=None,  # Default to boto3 defaults
-				help="Which single profile do you want to run against?")
+			"-p", "--profile",
+			dest="Profile",
+			metavar="Profile",
+			default=None,  # Default to boto3 defaults
+			help="Which single profile do you want to run against?")
 
 	def multiprofile(self):
 		self.my_parser.add_argument(
-				"-p", "-ps", "--profiles",
-				dest="Profiles",
-				nargs="*",
-				metavar="Profiles",
-				default=None,  # Defaults to default profile, but can support multiple profiles
-				help="Which profiles do you want to run against?")
+			"-p", "-ps", "--profiles",
+			dest="Profiles",
+			nargs="*",
+			metavar="Profiles",
+			default=None,  # Defaults to default profile, but can support multiple profiles
+			help="Which profiles do you want to run against?")
 
 	def multiregion(self):
 		self.my_parser.add_argument(
-				"-rs", "--regions", "-r",
-				nargs="*",
-				dest="Regions",
-				metavar="region name string",
-				default=["us-east-1"],
-				help="String fragment of the region(s) you want to check for resources. You can supply multiple fragments.")
+			"-rs", "--regions", "-r",
+			nargs="*",
+			dest="Regions",
+			metavar="region name string",
+			default=["us-east-1"],
+			help="String fragment of the region(s) you want to check for resources. You can supply multiple fragments.")
 
 	def multiregion_nodefault(self):
 		self.my_parser.add_argument(
-				"-r", "-rs", "--regions",
-				nargs="*",
-				dest="Regions",
-				metavar="region name string",
-				default=None,
-				help="String fragment of the region(s) you want to check for resources. You can supply multiple fragments.")
+			"-r", "-rs", "--regions",
+			nargs="*",
+			dest="Regions",
+			metavar="region name string",
+			default=None,
+			help="String fragment of the region(s) you want to check for resources. You can supply multiple fragments.")
 
 	def singleregion(self):
 		self.my_parser.add_argument(
-				"-r", "--region",
-				dest="Region",
-				metavar="region name string",
-				default="us-east-1",
-				help="Name of the single region(s) you want to check for resources.")
+			"-r", "--region",
+			dest="Region",
+			metavar="region name string",
+			default="us-east-1",
+			help="Name of the single region(s) you want to check for resources.")

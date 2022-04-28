@@ -1,19 +1,20 @@
-def all_my_instances(fProfiles, fRegionList, fverbose):
+import os
+import sys
+import boto3
+from inv_scr.core import Inventory_Modules
+from inv_scr.core.ArgumentsClass import CommonArguments
+from inv_scr.core.account_class import aws_acct_access
+from colorama import init, Fore
+from inv_scr.core.exceptions import InventoryScriptsExceptions
 
-	import os
-	import sys
-	import boto3
-	import inv_scr.core.Inventory_Modules
-	from inv_scr.core.ArgumentsClass import CommonArguments
-	from inv_scr.core.account_class import aws_acct_access
-	from colorama import init, Fore
-	from botocore.exceptions import ClientError
+import logging
 
-	import logging
+init()
 
-	init()
+logging.basicConfig(level=fverbose, format="[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s")
 
-	logging.basicConfig(level=fverbose, format="[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s")
+
+def all_my_instances(fProfiles, fRegionList):
 
 	##################
 
@@ -33,7 +34,7 @@ def all_my_instances(fProfiles, fRegionList, fverbose):
 				account_credentials = Inventory_Modules.get_child_access3(faws_acct, account['AccountId'])
 				logging.info(f"Connected to account {account['AccountId']} using role {account_credentials['Role']}")
 			# TODO: We shouldn't refer to "account_credentials['Role']" below, if there was an error.
-			except ClientError as my_Error:
+			except InventoryScriptsExceptions.ClientError as my_Error:
 				if str(my_Error).find("AuthFailure") > 0:
 					logging.error(
 						f"{account['AccountId']}: Authorization failure using role: {account_credentials['Role']}")
@@ -49,7 +50,7 @@ def all_my_instances(fProfiles, fRegionList, fverbose):
 				continue
 			for region in fRegionList:
 				try:
-					Instances = None
+					Instances = dict()
 					print(f"{ERASE_LINE}Checking account {account['AccountId']} in region {region}", end='\r')
 					Instances = Inventory_Modules.find_account_instances2(account_credentials, region)
 					logging.info(
@@ -118,9 +119,6 @@ def all_my_instances(fProfiles, fRegionList, fverbose):
 			AllChildAccounts.extend(aws_acct.ChildAccounts)
 
 	print(ERASE_LINE)
-	NumInstFound = len(InstancesFound)
-	NumChildAccounts = len(AllChildAccounts)
-	NumRegions = len(RegionList)
 	print(f"Found {len(InstancesFound)} instances across {len(AllChildAccounts)} accounts across {len(RegionList)} regions")
 	print()
 	print("Thank you for using this script")

@@ -103,6 +103,7 @@ def get_ec2_regions3(faws_acct, fkey=None):
 	regions = region_info.describe_regions(Filters=[
 		{'Name': 'opt-in-status', 'Values': ['opt-in-not-required', 'opted-in']}])
 	RegionNames = []
+	logging.info(f"Received {fkey} as region list to look through")
 	for region in regions['Regions']:
 		RegionNames.append(region['RegionName'])
 	if "all" in fkey or "ALL" in fkey or 'All' in fkey or fkey is None:
@@ -179,15 +180,15 @@ def get_profiles(fSkipProfiles=None, fprofiles=None):
 		fSkipProfiles = ['default']
 	if fprofiles is None:
 		fprofiles = ['all']
-	my_Session = boto3.Session()
-	my_profiles = my_Session._session.available_profiles
+	my_profiles = boto3.Session()._session.available_profiles
 	if "all" in fprofiles or "ALL" in fprofiles or "All" in fprofiles:
+		my_profiles = set(boto3.Session()._session.available_profiles) - set(fSkipProfiles)
 		return (my_profiles)
 	ProfileList = []
 	for x in fprofiles:
 		for y in my_profiles:
 			logging.info(f"Have {y}| Looking for {x}")
-			if y.find(x) >= 0:
+			if y.find(x) >= 0 and y not in fSkipProfiles:
 				logging.info(f"Found profile {y}")
 				ProfileList.append(y)
 	return (ProfileList)
@@ -1279,6 +1280,36 @@ def find_account_instances2(ocredentials, fRegion='us-east-1'):
 	while 'NextToken' in instances.keys():
 		instances = instance_info.describe_instances(NextToken=instances['NextToken'])
 		AllInstances['Reservations'].extend(instances['Reservations'])
+	return (AllInstances)
+
+
+def find_account_instances3(faws_acct, fRegion='us-east-1'):
+	"""
+	"""
+	import boto3
+	import logging
+
+	# if 'Profile' in ocredentials.keys() and ocredentials['Profile'] is not None:
+	# 	ProfileAccountNumber = find_account_number(ocredentials['Profile'])
+	# 	logging.info(
+	# 			f"Profile: {ocredentials['Profile']} | Profile Account Number: {ProfileAccountNumber} | Account Number passed in: {ocredentials['AccountNumber']}")
+	# 	if ProfileAccountNumber == ocredentials['AccountNumber']:
+	# 		session_ec2 = boto3.Session(profile_name=ocredentials['Profile'], region_name=fRegion)
+	# 	else:
+	# 		session_ec2 = boto3.Session(aws_access_key_id=ocredentials['AccessKeyId'],
+	# 		                            aws_secret_access_key=ocredentials['SecretAccessKey'],
+	# 		                            aws_session_token=ocredentials['SessionToken'],
+	# 		                            region_name=fRegion)
+	# else:
+	# 	session_ec2 = boto3.Session(aws_access_key_id=ocredentials['AccessKeyId'], aws_secret_access_key=ocredentials[
+	# 		'SecretAccessKey'], aws_session_token=ocredentials['SessionToken'], region_name=fRegion)
+	instance_info = faws_acct.session.client('ec2', region_name=fRegion)
+	logging.warning(f"Looking for instances in account # {faws_acct.acct_number} in region {fRegion}")
+	instances = instance_info.describe_instances()
+	AllInstances = instances['Reservations']
+	while 'NextToken' in instances.keys():
+		instances = instance_info.describe_instances(NextToken=instances['NextToken'])
+		AllInstances.extend(instances['Reservations'])
 	return (AllInstances)
 
 
