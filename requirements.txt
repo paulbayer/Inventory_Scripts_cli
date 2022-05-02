@@ -1,4 +1,6 @@
-boto3
-botocore
-setuptools
-colorama
+boto3~=1.21.38
+botocore~=1.24.38
+setuptools~=57.0.0
+colorama~=0.4.4
+
+XlsxWriter~=3.0.3

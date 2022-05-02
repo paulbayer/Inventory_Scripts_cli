@@ -950,18 +950,62 @@ def find_account_vpcs3(faws_acct, fRegion, defaultOnly=False):
 	"""
 	import logging
 
-	client_vpc = faws_acct.session.client('ec2')
+	client_vpc = faws_acct.session.client('ec2', region_name=fRegion)
+	all_data = list()
 	if defaultOnly:
-		logging.warning("Looking for default VPCs in account %s from Region %s", ocredentials['AccountNumber'], fRegion)
-		logging.info("defaultOnly: %s", str(defaultOnly))
+		logging.warning(f"Looking for default VPCs in account {faws_acct.acct_number} from Region {fRegion}")
+		logging.info(f"defaultOnly: { str(defaultOnly)}")
 		response = client_vpc.describe_vpcs(Filters=[{'Name': 'isDefault', 'Values': ['true']}])
+		all_data.extend(response['Vpcs'])
+		while 'NextToken' in response.keys():
+			response = client_vpc.describe_vpcs(Filters=[{'Name': 'isDefault', 'Values': ['true']}])
+			all_data.extend(response['Vpcs'])
 	else:
 		logging.warning(f"Looking for all VPCs in account {faws_acct.acct_num} from Region {fRegion}")
-		logging.info("defaultOnly: %s", str(defaultOnly))
+		logging.info(f"defaultOnly: {str(defaultOnly)}")
 		response = client_vpc.describe_vpcs()
-	# TODO: Enable pagination
-	logging.warning("We found %s VPCs", len(response['Vpcs']))
-	return (response)
+		all_data.extend(response['Vpcs'])
+		while 'NextToken' in response.keys():
+			response = client_vpc.describe_vpcs(Filters=[{'Name': 'isDefault', 'Values': ['true']}])
+			all_data.extend(response['Vpcs'])
+	logging.warning(f"We found {len(all_data)} VPCs")
+	return (all_data)
+
+
+def find_account_subnets3(faws_acct, fRegion):
+	"""
+	faws_acct uses the account_class object
+	"""
+	import logging
+
+	client_subnet = faws_acct.session.client('ec2', region_name=fRegion)
+	all_data = list()
+	logging.warning(f"Looking for all Subnets in account {faws_acct.acct_num} in Region {fRegion}")
+	response = client_subnet.describe_subnets()
+	all_data.extend(response['Subnets'])
+	while 'NextToken' in response.keys():
+		response = client_subnets.describe_subnets()
+		all_data.extend(response['Subnets'])
+	logging.warning(f"We found {len(all_data)} Subnets")
+	return (all_data)
+
+
+def find_account_eips3(faws_acct, fRegion):
+	"""
+	faws_acct uses the account_class object
+	"""
+	import logging
+
+	client_eip = faws_acct.session.client('ec2', region_name=fRegion)
+	all_data = list()
+	logging.warning(f"Looking for all EIPs in account {faws_acct.acct_num} in Region {fRegion}")
+	response = client_eip.describe_addresses()
+	all_data.extend(response['Addresses'])
+	while 'NextToken' in response.keys():
+		response = client_eips.describe_addresses()
+		all_data.extend(response['Addresses'])
+	logging.warning(f"We found {len(all_data)} EIP addresses")
+	return (all_data)
 
 
 def find_config_recorders2(ocredentials, fRegion):
