@@ -31,7 +31,7 @@ def check_accounts_for_vpcs(faws_acct, fRegionList=None):
 				logging.warning(f"It's possible that the region {region} hasn't been opted-into")
 				pass
 		for y in VPCs:
-			vpc_tags = y['Tags']
+			vpc_tags = y.get('Tags', None)
 			# TODO: This should be a loop collecting the CidrBlockAssociationSet,
 			#  but it's rare that there's more than one, so we'll use this for now.
 			CidrBlock = y['CidrBlock']
@@ -43,7 +43,7 @@ def check_accounts_for_vpcs(faws_acct, fRegionList=None):
 				for x in vpc_tags:
 					if x['Key'] == "Name":
 						Name = x['Value']
-			except KeyError as my_Error:  # This is needed for when there is no "Tags" key within the describe-instances output
+			except TypeError or KeyError as my_Error:  # This is needed for when there is no "Tags" key within the describe-instances output
 				logging.info(my_Error)
 				pass
 			vpc_row = {
@@ -97,7 +97,7 @@ def check_accounts_for_subnets(faws_acct, fRegionList=None):
 				'Ipv6CidrBlock' : Ipv6CidrBlock,
 				'OwnerId' : y['OwnerId'],
 				'SubnetId' : y['SubnetId'],
-				'Tags' : y['Tags'],
+				'Tags' : y.get('Tags', None),
 				'VpcId' : y['VpcId'],
 				'AvailabilityZone' : y['AvailabilityZone'],
 				'AvailabilityZoneId' : y['AvailabilityZoneId'],
@@ -140,14 +140,14 @@ def check_accounts_for_eips(faws_acct, fRegionList=None):
 				'MgmtAccountId': faws_acct.MgmtAccount,
 				'AccountId': faws_acct.acct_number,
 				'Region': region,
-				'EIPId' : EIPs['AllocationId'],
+				'EIPId' : y['AllocationId'],
 				'InstanceId': InstanceId,
-				'PublicIP' : EIPs['PublicIp'],
-				'NetworkInterfaceId' : EIPs['NetworkInterfaceId'],
-				'EIPOwner' : EIPs['NetworkInterfaceOwnerId'],
-				'PrivateIP' : EIPs['PrivateIpAddress'],
-				'Location' : EIPs['NetworkBorderGroup'],
-				'Tags' : EIPs['Tags'],
+				'PublicIP' : y['PublicIp'],
+				'NetworkInterfaceId' : y.get('NetworkInterfaceId', None),
+				'EIPOwner' : y.get('NetworkInterfaceOwnerId', None),
+				'PrivateIP' : y.get('PrivateIpAddress', None),
+				'Location' : y['NetworkBorderGroup'],
+				'Tags' : y.get('Tags', None),
 				}
 			all_eips.append(eip_row)
 	return (all_eips)

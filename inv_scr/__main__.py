@@ -74,6 +74,7 @@ def write_to_Excel(data_list, inventory_book):
 	for inventory_type in data_list:
 		tag_cell_formatting = inventory_book[inventory_type]['workbook'].add_format()
 		tag_cell_formatting.set_text_wrap(True)
+		# tag_cell_formatting.set_column()
 		for sub_type in data_list[inventory_type]:
 			row = 0
 			worksheet = inventory_book[inventory_type][sub_type]
@@ -94,6 +95,7 @@ def write_to_Excel(data_list, inventory_book):
 							# 'ENI ID', 'ENI Subnet ID', 'ENI EIP Address', 'ENI Primary Private IP','ENI IPv6 Address', 'ENI MAC',
 							tag_string = '\n'.join(
 									str(f"{key} = {value}") for key, value in enumerate(item[data_field]))
+						worksheet.set_column(row, column, 30, )
 						worksheet.write(row, column, tag_string, tag_cell_formatting)
 					elif isinstance(item[data_field], datetime):
 						worksheet.write(row, column, f"{item[data_field].replace(tzinfo=None)} UTC")
