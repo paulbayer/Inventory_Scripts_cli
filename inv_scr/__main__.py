@@ -79,23 +79,29 @@ def write_to_Excel(data_list, inventory_book):
 			row = 0
 			worksheet = inventory_book[inventory_type][sub_type]
 			worksheet.freeze_panes(1, 0)  # Freeze the first row.
+			max_width = 30
+			logging.info(f"Starting worksheet for {sub_type}")
 			for item in data_list[inventory_type][sub_type]:
 				row += 1
 				column = 0
 				tag_string = ''
-				logging.info(f"Starting worksheet for {sub_type}")
 				for data_field in inventory_book[inventory_type]['worksheets'][sub_type]['data_fields']:
 					logging.error(f"{data_field}: {item[data_field]}")
+					worksheet.set_column(column, column, 10)
 					if isinstance(item[data_field], list):
 						if data_field == 'Tags':
 							tag_string = '\n'.join(str(f"{i['Key']} = {i['Value']}") for i in item[data_field])
+							longest_string = max(item[data_field], key=len)
+							# max_width = len((f"{longest_string['Key']} : {longest_string['Value']}"))
+							max_width = max([len((f"{longest_string['Key']} : {longest_string['Value']}")), max_width])
+							# max_width = 30
+							worksheet.set_column(column, column, max_width)
 						elif data_field == 'SecurityGroups':
 							tag_string = '\n'.join(str(f"{i['GroupName']} = {i['GroupId']}") for i in item[data_field])
 						elif data_field == 'NetIfaces':
 							# 'ENI ID', 'ENI Subnet ID', 'ENI EIP Address', 'ENI Primary Private IP','ENI IPv6 Address', 'ENI MAC',
 							tag_string = '\n'.join(
 									str(f"{key} = {value}") for key, value in enumerate(item[data_field]))
-						worksheet.set_column(row, column, 30, )
 						worksheet.write(row, column, tag_string, tag_cell_formatting)
 					elif isinstance(item[data_field], datetime):
 						worksheet.write(row, column, f"{item[data_field].replace(tzinfo=None)} UTC")
