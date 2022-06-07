@@ -5,6 +5,7 @@ from inv_scr.functions.all_my_specific_functions import all_my_functions
 from inv_scr.functions.Network_Inventory import check_accounts_for_vpcs, check_accounts_for_subnets, \
 	check_accounts_for_eips
 from inv_scr.functions.Hosting_Inventory import check_accounts_for_instances
+from inv_scr.functions.Storage_Inventory import check_accounts_for_buckets, check_accounts_for_rds_databases
 from inv_scr.core.ArgumentsClass import CommonArguments
 from inv_scr.core.account_class import aws_acct_access
 from inv_scr.core import Inventory_Modules
@@ -87,7 +88,7 @@ def write_to_Excel(data_list, inventory_book):
 				tag_string = ''
 				for data_field in inventory_book[inventory_type]['worksheets'][sub_type]['data_fields']:
 					logging.error(f"{data_field}: {item[data_field]}")
-					worksheet.set_column(column, column, 10)
+					worksheet.set_column(column, column, 12)
 					if isinstance(item[data_field], list):
 						if data_field == 'Tags':
 							tag_string = '\n'.join(str(f"{i['Key']} = {i['Value']}") for i in item[data_field])
@@ -217,6 +218,31 @@ elif operation in ['all', 'inventory', ]:
 			                                         },
 		                                         }
 	                                         },
+	                   'storage_inventory': {'file_name' : 'Storage_Inventory.xlsx',
+	                                         'worksheets': {
+		                                         'Buckets'  : {
+			                                         'SheetName'  : 'S3 Buckets',
+			                                         'headings'   : ['Org Account', 'Child Account Number',
+			                                                         'Region',
+			                                                         'Name', 'Creation Date', 'Account Owner Email',
+			                                                         'Account Owner Canonical Name', ],
+			                                         'data_fields': ['MgmtAccountId', 'AccountId', 'Region',
+			                                                         'Name', 'CreationDate', 'OwnerAccountEmail',
+			                                                         'OwnerId', ],
+			                                         },
+		                                         'Databases': {
+			                                         'SheetName'  : 'RDS Databases',
+			                                         'headings'   : ['Org Account', 'Child Account Number',
+			                                                         'Region',
+			                                                         'Name', 'Creation Date', 'Account Owner Email',
+			                                                         'Account Owner Canonical Name', ],
+			                                         'data_fields': ['Org Account', 'Child Account Number',
+			                                                         'Region',
+			                                                         'Name', 'Creation Date', 'Account Owner Email',
+			                                                         'Account Owner Canonical Name', ],
+			                                         },
+		                                         },
+	                                         },
 	                   }
 
 	# Setup Networking Workbook
@@ -276,11 +302,18 @@ elif operation in ['all', 'inventory', ]:
 		# 	AWS EC2 Instances
 		instance_data = check_accounts_for_instances(account_object, RegionList)
 		all_data['hosting_inventory']['Instances'].extend(instance_data)
-	# 	AWS AMI Inventory (Active images only)
-	# 	S3 Buckets (acting as web server)
-	# # Data Repositories Inventory
-	# 	S3 Buckets
+		# 	AWS AMI Inventory (Active images only)
+		"""
+		Doesn't work yet - Images take WAY too long to show up
+	 	ami_data = check_accounts_for_amis(account_object, RegionList)
+		"""
+		# 	S3 Buckets (acting as web server)
+		# # Data Repositories Inventory
+		# 	S3 Buckets
+		s3_data = check_accounts_for_buckets(account_object, RegionList)
+		all_data['storage_inventory']['Buckets'].extend(s3_data)
 	# 	RDS Instances
+
 	# 	RDS Snapshots
 	# 	RDS Instance Backups
 	# 	DynamoDB Tables

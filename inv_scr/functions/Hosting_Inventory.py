@@ -71,3 +71,58 @@ def check_accounts_for_instances(faws_acct, fRegionList=None):
 					}
 				AllInstances.append(instance_row)
 	return (AllInstances)
+
+
+def check_accounts_for_amis(faws_acct, fRegionList=None):
+	AllAMIs = []
+	ami_row = {}
+	if fRegionList is None:
+		fRegionList = ['us-east-1']
+	AMIs = dict()
+	for region in fRegionList:
+		try:
+			print(f"{ERASE_LINE}Checking account {Fore.RED}{faws_acct.acct_number}{Fore.RESET} in region {Fore.RED}{region}{Fore.RESET}", end='\r')
+			AMIs = Inventory_Modules.find_account_amis3(faws_acct, region)
+			logging.info(
+					f"Root Account: {faws_acct.MgmtAccount} Account: {faws_acct.acct_number} Region: {region} | Found {len(AMIs)} instances")
+		except ClientError as my_Error:
+			if str(my_Error).find("AuthFailure") > 0:
+				logging.error(f"Authorization Failure accessing account {faws_acct.acct_number} in {region} region")
+				logging.warning(f"It's possible that the region {region} hasn't been opted-into")
+				pass
+		for y in AMIs:
+			for z in y['Images']:
+				Name = "No Name Tag"
+				try:
+					for x in range(len(z['Tags'])):
+						if z['Tags'][x]['Key'] == "Name":
+							Name = z['Tags'][x]['Value']
+				except KeyError as my_Error:  # This is needed for when there is no "Tags" key within the describe-instances output
+					logging.info(my_Error)
+					pass
+				ami_row = {
+					'AccountId': faws_acct.acct_number,
+					'MgmtAccountId': faws_acct.MgmtAccount,
+					'Region': region,
+					'Name': Name,
+					'AMIId' : z['ImageId'],
+					'AvailabilityZone' : z['Placement']['AvailabilityZone'],
+					'Hypervisor' : z['Hypervisor'],
+					'InstanceId' : z['InstanceId'],
+					'InstanceType' : z['InstanceType'],
+					'Launch_DateTime' : z['LaunchTime'],
+					'PlatformOS' : z['PlatformDetails'],
+					'PrivateIPAddress' : z['PrivateIpAddress'],
+					'PublicIPAddress' : z.get('PublicIpAddress', None),
+					'PublicDnsName' : z.get('PublicDnsName', None),
+					'State' : z['State']['Name'],
+					'SubnetId' : z['SubnetId'],
+					'VPCId' : z['VpcId'],
+					'VirtualizationType' : z['VirtualizationType'],
+					'Tags' : z.get('Tags', None),
+					'SecurityGroups' : z['SecurityGroups'],
+					'NetIfaces' : z['NetworkInterfaces'],
+					}
+				AllAMIs.append(ami_row)
+	return (AllAMIs)
+

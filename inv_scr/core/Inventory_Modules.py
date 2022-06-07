@@ -961,7 +961,7 @@ def find_account_vpcs3(faws_acct, fRegion, defaultOnly=False):
 			response = client_vpc.describe_vpcs(Filters=[{'Name': 'isDefault', 'Values': ['true']}])
 			all_data.extend(response['Vpcs'])
 	else:
-		logging.warning(f"Looking for all VPCs in account {faws_acct.acct_num} from Region {fRegion}")
+		logging.warning(f"Looking for all VPCs in account {faws_acct.acct_number} from Region {fRegion}")
 		logging.info(f"defaultOnly: {str(defaultOnly)}")
 		response = client_vpc.describe_vpcs()
 		all_data.extend(response['Vpcs'])
@@ -980,7 +980,7 @@ def find_account_subnets3(faws_acct, fRegion):
 
 	client_subnet = faws_acct.session.client('ec2', region_name=fRegion)
 	all_data = list()
-	logging.warning(f"Looking for all Subnets in account {faws_acct.acct_num} in Region {fRegion}")
+	logging.warning(f"Looking for all Subnets in account {faws_acct.acct_number} in Region {fRegion}")
 	response = client_subnet.describe_subnets()
 	all_data.extend(response['Subnets'])
 	while 'NextToken' in response.keys():
@@ -998,13 +998,73 @@ def find_account_eips3(faws_acct, fRegion):
 
 	client_eip = faws_acct.session.client('ec2', region_name=fRegion)
 	all_data = list()
-	logging.warning(f"Looking for all EIPs in account {faws_acct.acct_num} in Region {fRegion}")
+	logging.warning(f"Looking for all EIPs in account {faws_acct.acct_number} in Region {fRegion}")
 	response = client_eip.describe_addresses()
 	all_data.extend(response['Addresses'])
 	while 'NextToken' in response.keys():
 		response = client_eips.describe_addresses()
 		all_data.extend(response['Addresses'])
 	logging.warning(f"We found {len(all_data)} EIP addresses")
+	return (all_data)
+
+
+def find_account_amis3(faws_acct, fRegion):
+	"""
+	faws_acct uses the account_class object
+	"""
+	import logging
+
+	client_ami = faws_acct.session.client('ec2', region_name=fRegion)
+	all_data = list()
+	logging.warning(f"Looking for all AMIs in account {faws_acct.acct_number} in Region {fRegion}")
+	response = client_ami.describe_images()
+	all_data.extend(response['Images'])
+	logging.info(f"Found {len(all_data)} images")
+	while 'NextToken' in response.keys():
+		response = client_eips.describe_addresses()
+		logging.info(f"Found {len(response['Images'])} more images")
+		all_data.extend(response['Images'])
+	logging.warning(f"We found {len(all_data)} Images")
+	return (all_data)
+
+
+def find_account_bucket3(faws_acct, fRegion):
+	"""
+	faws_acct uses the account_class object
+	"""
+	import logging
+
+	client_s3 = faws_acct.session.client('s3', region_name=fRegion)
+	all_data = list()
+	logging.warning(f"Looking for all S3 Buckets in account {faws_acct.acct_number} in Region {fRegion}")
+	response = client_s3.list_buckets()
+	all_data.append(response)
+	logging.info(f"Found {len(all_data)} buckets")
+	while 'NextToken' in response.keys():
+		response = client_s3.list_buckets()
+		logging.info(f"Found {len(response['Buckets'])} more buckets")
+		all_data.append(response)
+	logging.warning(f"We found {len(all_data)} buckets")
+	return (all_data)
+
+
+def find_account_databases3(faws_acct, fRegion):
+	"""
+	faws_acct uses the account_class object
+	"""
+	import logging
+
+	client_rds = faws_acct.session.client('rds', region_name=fRegion)
+	all_data = list()
+	logging.warning(f"Looking for all RDS Instances in account {faws_acct.acct_number} in Region {fRegion}")
+	response = client_rds.describe_db_instances()
+	all_data.extend(response['DBInstances'])
+	logging.info(f"Found {len(all_data)} databases")
+	while 'NextToken' in response.keys():
+		response = client_rds.describe_db_instances()
+		logging.info(f"Found {len(response['DBInstances'])} more databases")
+		all_data.extend(response['DBInstances'])
+	logging.warning(f"We found {len(all_data)} databases")
 	return (all_data)
 
 
@@ -1182,7 +1242,7 @@ def find_cloudtrails2(ocredentials, fRegion, fCloudTrailnames=None):
 					fullresponse.extend(response['Trails'])
 		except ClientError as my_Error:
 			logging.error(my_Error)
-			fullresponse = {'Success': False, error_message: my_Error}
+			fullresponse = {'Success': False, 'error_message': my_Error}
 		return (fullresponse)
 	else:
 		# TODO: This doesn't work... Needs to be fixed.
