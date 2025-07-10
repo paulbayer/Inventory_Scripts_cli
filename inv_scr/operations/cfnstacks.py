@@ -6,6 +6,7 @@ CloudFormation Stacks inventory operation
 import logging
 from queue import Queue
 from threading import Thread
+from tqdm.auto import tqdm
 from time import time
 from botocore.exceptions import ClientError
 from colorama import Fore, init
@@ -111,7 +112,7 @@ def find_all_cfnstacks(fAllCredentials: list, fStackfrag: list = None, fstatus: 
                         logging.warning(my_Error)
                         continue
                 finally:
-                    print(".", end='')
+                    pbar.update()
                     self.queue.task_done()
 
     ###########
@@ -120,6 +121,11 @@ def find_all_cfnstacks(fAllCredentials: list, fStackfrag: list = None, fstatus: 
     AllStacks = []
     WorkerThreads = min(len(fAllCredentials), 25)
 
+    pbar = tqdm(
+        desc=f'Finding stacks from {len(fAllCredentials)} locations',
+        total=len(fAllCredentials), 
+        unit=' locations'
+    )
     for x in range(WorkerThreads):
         worker = FindStacks(checkqueue)
         worker.daemon = True
@@ -135,6 +141,7 @@ def find_all_cfnstacks(fAllCredentials: list, fStackfrag: list = None, fstatus: 
                 logging.warning(f"It's possible that the region {credential['Region']} hasn't been opted-into")
                 pass
     checkqueue.join()
+    pbar.close()
     return AllStacks
 
 def run(args):
@@ -160,10 +167,12 @@ def run(args):
     print("Searching for CloudFormation stacks...")
     print(f"Operation version: {__version__}")
     print(f"Looking for stacks with fragments: {Fore.RED}{pFragments}{Fore.RESET}")
-    if pExact:
-        print(f"Using {Fore.RED}exact match{Fore.RESET} for stack names")
+    if pFragments == ['all']:
+        print(f"Matching {Fore.RED}all{Fore.RESET} stack names")
+    elif pExact:
+        print(f"Matching stacknames{Fore.RED}exactly{Fore.RESET}")
     else:
-        print(f"Using {Fore.RED}contains match{Fore.RESET} for stack names")
+        print(f"Matching any stackset that {Fore.RED}contains a match{Fore.RESET}")
     
     if timing:
         timing.milestone("args_parsed", "Arguments parsed and validated")
@@ -209,4 +218,4 @@ def run(args):
     if timing:
         timing.milestone("results_displayed", "Results formatted and displayed")
     
-    print(f"\nFound {len(AllStacks)} CloudFormation stacks across {AccountNum} accounts and {RegionNum} regions")
+    print(f"\nFound {len(AllStacks)} CloudFormation stacks across {AccountNum} accounts and {RegionNum} region{'' if RegionNum == 1 else 's'}")
