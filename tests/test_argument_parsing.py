@@ -118,6 +118,7 @@ class TestArgumentParsing(unittest.TestCase):
         args4 = parser4.my_parser.parse_args(['--regions', 'us-east-1', 'us-west-2'])
         self.assertEqual(args4.Regions, ['us-east-1', 'us-west-2'])
 
+    
     def test_boolean_flags(self):
         """Test boolean flag arguments"""
         self.parser.rootOnly()

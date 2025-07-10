@@ -137,6 +137,7 @@ def run(args):
     pTiming = args.Time
     
     print("Searching for EC2 instances...")
+    print(f"Operation version: {__version__}")
     
     if timing:
         timing.milestone("args_parsed", "Arguments parsed and validated")
@@ -184,4 +185,3 @@ def run(args):
         timing.milestone("results_displayed", "Results formatted and displayed")
     
     print(f"\nFound {len(AllInstances)} instances across {AccountNum} accounts and {RegionNum} regions")
-    print(f"Operation version: {__version__}")

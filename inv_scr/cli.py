@@ -46,6 +46,13 @@ OPERATIONS = {
 
 def parse_args():
     """Parse command line arguments"""
+    import sys
+    
+    # First, determine which operation is being requested
+    operation = None
+    if len(sys.argv) > 1 and sys.argv[1] in list(OPERATIONS.keys()) + ['list']:
+        operation = sys.argv[1]
+    
     parser = CommonArguments()
     parser.my_parser.description = "AWS Inventory CLI - Find resources across AWS Organizations"
     parser.my_parser.add_argument(
@@ -65,14 +72,11 @@ def parse_args():
     parser.verbosity()
     parser.version(__version__)
     
-    # Parse known args first to get the operation
-    args, remaining = parser.my_parser.parse_known_args()
-    
-    # If it's not the list operation, add operation-specific arguments
-    if hasattr(args, 'operation') and args.operation != 'list':
+    # Add operation-specific arguments if we know the operation
+    if operation and operation != 'list':
         try:
             # Import the operation module and add its specific arguments
-            operation_module = __import__(f'inv_scr.operations.{args.operation.replace("-", "_")}', fromlist=['add_operation_args'])
+            operation_module = __import__(f'inv_scr.operations.{operation.replace("-", "_")}', fromlist=['add_operation_args'])
             if hasattr(operation_module, 'add_operation_args'):
                 operation_module.add_operation_args(parser)
         except ImportError:
