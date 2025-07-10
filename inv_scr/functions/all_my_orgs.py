@@ -1,144 +1,104 @@
 #!/usr/bin/env python3
 
-import os
 import sys
+from os.path import split
 import logging
 from ArgumentsClass import CommonArguments
-from account_class import aws_acct_access
-import Inventory_Modules
-from botocore.exceptions import ClientError, NoCredentialsError, InvalidConfigError
+from Inventory_Modules import get_profiles, get_org_accounts_from_profiles, display_results
+from time import time
+# from botocore.exceptions import ClientError, NoCredentialsError, InvalidConfigError
 from colorama import init, Fore, Style
 
 init()
+__version__ = "2025.04.08"
+ERASE_LINE = '\x1b[2K'
+begin_time = time()
 
-parser = CommonArguments()
-parser.multiprofile()
-parser.verbosity()
-parser.my_parser.add_argument(
-		'-R', '--root',
-		help="Display only the root accounts found in the profiles",
+
+# TODO: If they provide a profile that isn't a root profile, you should find out which org it belongs to, and then show the org for that.
+#  This will be difficult, since we don't know which profile that belongs to. Hmmm...
+
+
+##################
+# Functions
+##################
+def parse_args(f_arguments):
+	script_path, script_name = split(sys.argv[0])
+	parser = CommonArguments()
+	parser.multiprofile()
+	parser.extendedargs()
+	parser.rootOnly()
+	parser.timing()
+	parser.save_to_file()
+	parser.verbosity()
+	parser.version(__version__)
+	local = parser.my_parser.add_argument_group(script_name, 'Parameters specific to this script')
+
+	local.add_argument(
+		'-s', '-q', '--short',
+		help="Display only brief listing of the profile accounts, and not the Child Accounts under them",
 		action="store_const",
-		dest="rootonly",
+		dest="pShortform",
 		const=True,
 		default=False)
-parser.my_parser.add_argument(
-		'-s', '--q', '--short',
-		help="Display only brief listing of the root accounts, and not the Child Accounts under them",
-		action="store_const",
-		dest="shortform",
-		const=True,
-		default=False)
-parser.my_parser.add_argument(
-		'-A', '--account',
+	local.add_argument(
+		'-A', '--acct',
 		help="Find which Org this account is a part of",
 		nargs="*",
 		dest="accountList",
 		default=None)
-args = parser.my_parser.parse_args()
+	return parser.my_parser.parse_args(f_arguments)
 
-pProfiles = args.Profiles
-verbose = args.loglevel
-rootonly = args.rootonly
-shortform = args.shortform
-pAccountList = args.accountList
-logging.basicConfig(level=args.loglevel, format="[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s")
 
-SkipProfiles = ["default"]
-ERASE_LINE = '\x1b[2K'
+def all_my_orgs(f_Profiles: list, f_SkipProfiles: list, f_AccountList: list, f_Timing: bool, f_RootOnly: bool, f_SaveFilename: str, f_Shortform: bool, f_verbose):
+	ProfileList = get_profiles(fSkipProfiles=f_SkipProfiles, fprofiles=f_Profiles)
+	logging.info(f"These profiles were requested: {f_Profiles}.")
+	logging.warning(f"These profiles are being checked: {ProfileList}.")
+	print(f"Please bear with us as we run through {len(ProfileList)} profile{'s' if len(ProfileList) == 1 else ''}")
+	AllProfileAccounts = get_org_accounts_from_profiles(ProfileList)
+	if not AllProfileAccounts:
+		logging.info(f"No profiles were found, hence we're going to look at the environment variables")
+		print(f"No profiles were found, hence we're going to look at the environment variables")
+		AllProfileAccounts = get_org_accounts_from_profiles()
+	AccountList = []
+	FailedProfiles = []
+	OrgsFound = []
 
-RootAccts = []  # List of the Organization Root's Account Number
-RootProfiles = []  # List of the Organization Root's profiles
+	# Print out the results
+	if f_Timing:
+		print()
+		print(f"It's taken {Fore.GREEN}{time() - begin_time:.2f}{Fore.RESET} seconds to find {len(ProfileList)} profile accounts...")
+		print()
+	fmt = '%-36s %-15s %-15s %-12s %-10s'
+	print("<------------------------------------>")
+	print(fmt % ("Profile Name", "Account Number", "Payer Org Acct", "Org ID", "Root Acct?"))
+	print(fmt % ("------------", "--------------", "--------------", "------", "----------"))
 
-logging.warning("All available profiles will be shown")
-ProfileList = Inventory_Modules.get_profiles(fSkipProfiles=SkipProfiles, fprofiles=pProfiles)
-AccountOrgAssociationList = []
-# ShowEverything = True
-
-"""
-TODO:
-	If they provide a profile that isn't a root profile, you should find out which org it belongs to, 
-	and then show the org for that. 
-	This will be difficult, since we don't know which profile that belongs to. Hmmm...
-"""
-
-fmt = '%-23s %-15s %-27s %-12s %-10s'
-print("------------------------------------")
-print(fmt % ("Profile Name", "Account Number", "Payer Org Acct", "Org ID", "Root Acct?"))
-print(fmt % ("------------", "--------------", "--------------", "------", "----------"))
-NumProfiles = 0
-FailedProfiles = []
-for profile in ProfileList:
-	try:
-		NumProfiles += 1
-		print(f"{ERASE_LINE}Trying profile '{profile}' -- {NumProfiles} of {len(ProfileList)}", end='\r')
-		aws_acct = aws_acct_access(profile)
-		ErrorFlag = False
-		RootAcct = False
-		MnmgtAcct = None
-		Email = None
-		OrgId = None
-		if aws_acct.acct_number in ['123456789012', 'Failure']:
-			ErrorFlag = True
-			logging.info(f"Access to the profile {profile} has failed")
-			FailedProfiles.append(profile)
-			pass
-		elif aws_acct.AccountType.lower() == 'root':  # The Account is deemed to be an Management Account
-			logging.info(f"AccountNumber: {aws_acct.acct_number}")
-			MnmgtAcct = aws_acct.MgmtAccount
-			Email = aws_acct.MgmtEmail
-			OrgId = aws_acct.OrgID
-			RootAcct = True
-			RootAccts.append(MnmgtAcct)
-			RootProfiles.append(profile)
-		elif aws_acct.AccountType.lower() in ['standalone', 'child']:
-			MnmgtAcct = aws_acct.MgmtAccount
-			Email = aws_acct.MgmtEmail
-			OrgId = aws_acct.OrgID
-			RootAcct = False
-		if pAccountList is not None:
-			for acctnum in aws_acct.ChildAccounts:
-				if acctnum['AccountId'] in pAccountList:
-					AccountOrgAssociationList.append({'Account': acctnum['AccountId'], 'Org': aws_acct.MgmtAccount})
-	except ClientError as my_Error:
-		ErrorFlag = True
-		FailedProfiles.append(profile)
-		if str(my_Error).find("AWSOrganizationsNotInUseException") > 0:
-			MnmgtAcct = "Not an Org Account"
-		elif str(my_Error).find("AccessDenied") > 0:
-			MnmgtAcct = "Acct not auth for Org API."
-		elif str(my_Error).find("InvalidClientTokenId") > 0:
-			MnmgtAcct = "Credentials Invalid."
-		elif str(my_Error).find("ExpiredToken") > 0:
-			MnmgtAcct = "Token Expired."
+	for item in AllProfileAccounts:
+		logging.error(item)
+		if not item['Success']:
+			# If the profile failed, don't print anything and continue on.
+			FailedProfiles.append(item['profile'])
+			logging.error(f"{item['profile']} errored. Message: {item['ErrorMessage']}")
 		else:
-			print("Client Error")
-			print(my_Error)
-	except InvalidConfigError as my_Error:
-		ErrorFlag = True
-		FailedProfiles.append(profile)
-		if str(my_Error).find("does not exist") > 0:
-			print("Source profile error")
-			print(my_Error)
-		else:
-			print("Credentials Error")
-			print(my_Error)
-	except NoCredentialsError as my_Error:
-		ErrorFlag = True
-		FailedProfiles.append(profile)
-		if str(my_Error).find("Unable to locate credentials") > 0:
-			MnmgtAcct = "This profile doesn't have credentials."
-		else:
-			print("Credentials Error")
-			print(my_Error)
-	except AttributeError or Exception as my_Error:
-		ErrorFlag = True
-		FailedProfiles.append(profile)
-		if str(my_Error).find("object has no attribute") > 0:
-			MnmgtAcct = "This profile's credentials don't work."
-			print(my_Error)
-		else:
-			print("Credentials Error")
-			print(my_Error)
+			if item['RootAcct']:
+				# If the account is a root account, capture it for display later
+				OrgsFound.append(item['MgmtAccount'])
+			# Print results for all profiles
+			item['AccountId'] = item['aws_acct'].acct_number
+			item['AccountStatus'] = item['aws_acct'].AccountStatus
+			# item['AccountEmail'] = item['aws_acct'].
+			try:
+				if f_RootOnly and not item['RootAcct']:
+					# If we're only looking for root accounts, and this isn't one, don't print anything and continue on.
+					continue
+				else:
+					logging.info(f"{item['profile']} was successful.")
+					print(f"{Fore.RED if item['RootAcct'] else ''}{item['profile']:36s} {item['aws_acct'].acct_number:15s} {item['MgmtAccount']:15s} {str(item['OrgId']):12s} {item['RootAcct']}{Fore.RESET}")
+			except TypeError as my_Error:
+				logging.error(f"Error - {my_Error} on {item}")
+				pass
+
 	'''
 	If I create a dictionary from the Root Accts and Root Profiles Lists - 
 	I can use that to determine which profile belongs to the root user of my (child) account.
@@ -147,49 +107,154 @@ for profile in ProfileList:
 	and we keep all output in another dictionary - where we can populate the missing data at the end... 
 	but that takes a long time, since nothing would be sent to the screen in the meantime.
 	'''
-	# Print results for this profile
-	if ErrorFlag:
-		continue
-	elif RootAcct:
-		print(Fore.RED + fmt % (
-			profile, aws_acct.acct_number, aws_acct.MgmtAccount, aws_acct.OrgID, RootAcct) + Style.RESET_ALL)
-	# If I'm looking for only the root accounts, when I find something that isn't a root account, don't print anything and continue on.
-	elif rootonly:
-		print(f"{ERASE_LINE}{profile} isn't a root account", end="\r")
+
+	print(ERASE_LINE)
+	print("-------------------")
+
+	if f_Shortform:
+		# The user specified "short-form" which means they don't want any information on child accounts.
+		return_response = {'OrgsFound'         : OrgsFound,
+		                   'FailedProfiles'    : FailedProfiles,
+		                   'AllProfileAccounts': AllProfileAccounts}
 	else:
-		print(fmt % (profile, aws_acct.acct_number, aws_acct.MgmtAccount, aws_acct.OrgID, RootAcct))
-print(ERASE_LINE)
-print("-------------------")
+		NumOfOrgAccounts = 0
+		ClosedAccounts = []
+		FailedAccounts = 0
+		account = dict()
+		ProfileNameLength = len("Organization's Profile")
 
-if not shortform:
-	fmt = '%-23s %-15s %-6s'
-	child_fmt = "\t\t%-20s %-20s"
+		for item in AllProfileAccounts:
+			# AllProfileAccounts holds the list of account class objects of the accounts associated with the profiles it found.
+			if item['Success'] and not item['RootAcct']:
+				account.update(item['aws_acct'].ChildAccounts[0])
+				account.update({'Profile': item['profile']})
+				AccountList.append(account.copy())
+			elif item['Success'] and item['RootAcct']:
+				for child_acct in item['aws_acct'].ChildAccounts:
+					account.update(child_acct)
+					account.update({'Profile': item['profile']})
+					ProfileNameLength = max(len(item['profile']), ProfileNameLength) if item['profile'] else len("Organization's Profile")
+					AccountList.append(account.copy())
+					if not child_acct['AccountStatus'] == 'ACTIVE':
+						ClosedAccounts.append(child_acct['AccountId'])
+
+				NumOfOrgAccounts += len(item['aws_acct'].ChildAccounts)
+			elif not item['Success']:
+				FailedAccounts += 1
+				continue
+
+		# Display results on screen
+		if f_SaveFilename is None:
+			fmt = '%-23s %-15s'
+			print()
+			print(fmt % ("Organization's Profile", "Root Account"))
+			print(fmt % ("----------------------", "------------"))
+			for item in AllProfileAccounts:
+				if item['Success'] and item['RootAcct']:
+					print(f"{item['profile']:{ProfileNameLength + 2}s}", end='') if item['profile'] else print(f"{'No Profile available':{ProfileNameLength + 2}s}", end='')
+					print(f"{Style.BRIGHT}{item['MgmtAccount']:15s}{Style.RESET_ALL}")
+					print(f"\t{'Child Account Number':{len('Child Account Number')}s} {'Child Account Status':{len('Child Account Status')}s} {'Child Email Address'}")
+					for child_acct in item['aws_acct'].ChildAccounts:
+						print(f"\t{Fore.RED if not child_acct['AccountStatus'] == 'ACTIVE' else ''}{child_acct['AccountId']:{len('Child Account Number')}s} {child_acct['AccountStatus']:{len('Child Account Status')}s} {child_acct['AccountEmail']}{Fore.RESET}")
+
+		elif f_SaveFilename is not None:
+			# The user specified a file name, which means they want a (pipe-delimited) CSV file with the relevant output.
+			display_dict = {'MgmtAccount'  : {'DisplayOrder': 1, 'Heading': 'Parent Acct'},
+			                'AccountId'    : {'DisplayOrder': 2, 'Heading': 'Account Number'},
+			                'AccountStatus': {'DisplayOrder': 3, 'Heading': 'Account Status', 'Condition': ['SUSPENDED', 'CLOSED']},
+			                'AccountEmail' : {'DisplayOrder': 4, 'Heading': 'Email'}}
+			if pRootOnly:
+				sorted_Results = sorted(AllProfileAccounts, key=lambda d: (d['MgmtAccount'], d['AccountId']))
+			else:
+				sorted_Results = sorted(AccountList, key=lambda d: (d['MgmtAccount'], d['AccountId']))
+			display_results(sorted_Results, display_dict, "None", f_SaveFilename)
+
+		StandAloneAccounts = [x['AccountId'] for x in AccountList if x['MgmtAccount'] == x['AccountId'] and x['AccountEmail'] == 'Not an Org Management Account']
+		FailedProfiles = [i['profile'] for i in AllProfileAccounts if not i['Success']]
+		OrgsFound = [i['MgmtAccount'] for i in AllProfileAccounts if i['RootAcct']]
+		StandAloneAccounts.sort()
+		FailedProfiles.sort()
+		OrgsFound.sort()
+		ClosedAccounts.sort()
+
+		orgs = ClassOrgsFound()
+		orgs.orgs_found = OrgsFound.copy()
+		orgs.num_of_org_accounts = NumOfOrgAccounts
+		orgs.closed_accounts = ClosedAccounts.copy()
+		orgs.failed_profiles = FailedProfiles.copy()
+		orgs.stand_alone_accounts = StandAloneAccounts.copy()
+		orgs.account_list = AccountList.copy()
+
+		# return_response = {'OrgsFound'         : OrgsFound,
+		#                    'NumOfOrgAccounts'  : NumOfOrgAccounts,
+		#                    'StandAloneAccounts': StandAloneAccounts,
+		#                    'ClosedAccounts'    : ClosedAccounts,
+		#                    'FailedProfiles'    : FailedProfiles,
+		#                    'AccountList'       : AccountList}
+
+	return orgs
+
+
+##################
+# Main
+##################
+
+class ClassOrgsFound:
+	def __init__(self):
+		self.orgs_found = []
+		self.num_of_org_accounts = 0
+		self.stand_alone_accounts = []
+		self.closed_accounts = []
+		self.failed_profiles = []
+		self.account_list = []
+
+
+if __name__ == '__main__':
+	args = parse_args(sys.argv[1:])
+
+	pProfiles = args.Profiles
+	pRootOnly = args.RootOnly
+	pTiming = args.Time
+	pSkipAccounts = args.SkipAccounts
+	pSkipProfiles = args.SkipProfiles
+	verbose = args.loglevel
+	pSaveFilename = args.Filename
+	pShortform = args.pShortform
+	pAccountList = args.accountList
+	logging.basicConfig(level=verbose, format="[%(filename)s:%(lineno)s - %(processName)s %(threadName)s %(funcName)20s() ] %(message)s")
+	logging.getLogger("boto3").setLevel(logging.CRITICAL)
+	logging.getLogger("botocore").setLevel(logging.CRITICAL)
+	logging.getLogger("s3transfer").setLevel(logging.CRITICAL)
+	logging.getLogger("urllib3").setLevel(logging.CRITICAL)
+
+	response = all_my_orgs(pProfiles, pSkipProfiles, pAccountList, pTiming, pRootOnly, pSaveFilename, pShortform, verbose)
+
 	print()
-	print(fmt % ("Organization's Profile", "Root Account", "ALZ"))
-	print(fmt % ("----------------------", "------------", "---"))
-	NumOfAccounts = 0
-	for profile in RootProfiles:
-		aws_acct = aws_acct_access(profile)
-		MnmgtAcct = aws_acct.acct_number
-		child_accounts = aws_acct.ChildAccounts
-		landing_zone = Inventory_Modules.find_if_alz(profile)['ALZ']
-		NumOfAccounts += len(child_accounts)
-		if landing_zone:
-			fmt = f"%-23s {Style.BRIGHT}%-15s {Style.RESET_ALL}{Fore.RED}%-6s {Fore.RESET}"
-		else:
-			fmt = f"%-23s {Style.BRIGHT}%-15s {Style.RESET_ALL}%-6s"
-		print(fmt % (profile, aws_acct.MgmtAccount, landing_zone))
-		print(child_fmt % ("Child Account Number", "Child Email Address"))
-		# for account in sorted(child_accounts):
-		for account in child_accounts:
-			print(child_fmt % (account['AccountId'], account['AccountEmail']))
+	print(f"Number of Organizations: {len(response.orgs_found)}")
+	print(f"Number of Organization Accounts: {response.num_of_org_accounts}")
+
+	print(f"Number of Standalone Accounts: {len(response.stand_alone_accounts)}")
+	print(f"Number of suspended or closed accounts: {len(response.closed_accounts)}")
+	print(f"Number of profiles that failed: {len(response.failed_profiles)}")
+	if verbose < 50:
+		print("----------------------")
+		print(f"The following accounts are the Org Accounts: {response.orgs_found}")
+		print(f"The following accounts are Standalone: {response.stand_alone_accounts}") if len(response.stand_alone_accounts) > 0 else None
+		print(f"The following accounts are closed or suspended: {response.closed_accounts}") if len(response.closed_accounts) > 0 else None
+		print(f"The following profiles failed: {response.failed_profiles}") if len(response.failed_profiles) > 0 else None
+		print("----------------------")
 	print()
-	print("Number of Organizations:", len(RootProfiles))
-	print("Number of Organization Accounts:", NumOfAccounts)
-	print(f"Number of profiles that failed: {len(FailedProfiles)}")
-	logging.error(f"List of failed profiles: {FailedProfiles}")
 
-for acct in AccountOrgAssociationList:
-	print(f"Account: {acct['Account']} | Org: {acct['Org']}")
+	if pAccountList is not None:
+		print(f"Found the requested account number{'' if len(response.account_list) == 1 else 's'}:")
+		for acct in response.account_list:
+			if acct['AccountId'] in pAccountList:
+				print(f"Profile: {acct['Profile']} | Org: {acct['MgmtAccount']} | Account: {acct['AccountId']} | Status: {acct['AccountStatus']} | Email: {acct['AccountEmail']}")
 
-print("Thanks for using this script")
+
+	print()
+	if pTiming:
+		print(f"{Fore.GREEN}This script took {time() - begin_time:.2f} seconds{Fore.RESET}")
+		print()
+	print("Thanks for using this script")
+	print()

@@ -1,125 +1,207 @@
 #!/usr/bin/env python3
 
-import Inventory_Modules
-import argparse
-from colorama import init, Fore
-from botocore.exceptions import ClientError
 
 import logging
+import sys
+from queue import Queue
+# from tqdm.auto import tqdm
+from threading import Thread
+from time import time
+
+from botocore.exceptions import ClientError
+from colorama import Fore, init
+
+import Inventory_Modules
+from ArgumentsClass import CommonArguments
+from Inventory_Modules import display_results, get_all_credentials
 
 init()
+__version__ = "2024.01.26"
 
-parser = argparse.ArgumentParser(
-	description="We\'re going to find all vpcs within any of the profiles we have access to.",
-	prefix_chars='-+/')
-parser.add_argument(
-	"-p", "--profile",
-	dest="pProfiles",
-	nargs="*",
-	metavar="profile to use",
-	default=["default"],
-	help="To specify a specific profile, use this parameter. Default will be ALL profiles, including those in ~/.aws/credentials and ~/.aws/config")
-parser.add_argument(
-	"-r", "--region",
-	nargs="*",
-	dest="pregion",
-	metavar="region name string",
-	default=["us-east-1"],
-	help="String fragment of the region(s) you want to check for resources.")
-parser.add_argument(
-	"--default",
-	dest="pDefaultOnly",
-	metavar="Default Only flag",
-	action="store_const",
-	const=True,
-	default=False,
-	help="Flag to determine whether default VPCs are included in the output.")
-parser.add_argument(
-	'-d', '--debug',
-	help="Print LOTS of debugging statements",
-	action="store_const",
-	dest="loglevel",
-	const=logging.DEBUG,        # args.loglevel = 10
-	default=logging.CRITICAL)   # args.loglevel = 50
-parser.add_argument(
-	'-vvv',
-	help="Print INFO level statements",
-	action="store_const",
-	dest="loglevel",
-	const=logging.INFO,         # args.loglevel = 20
-	default=logging.CRITICAL)   # args.loglevel = 50
-parser.add_argument(
-	'-vv', '--verbose',
-	help="Be MORE verbose",
-	action="store_const",
-	dest="loglevel",
-	const=logging.WARNING,      # args.loglevel = 30
-	default=logging.CRITICAL)   # args.loglevel = 50
-parser.add_argument(
-	'-v',
-	help="Be verbose",
-	action="store_const",
-	dest="loglevel",
-	const=logging.ERROR,        # args.loglevel = 40
-	default=logging.CRITICAL)   # args.loglevel = 50
-args = parser.parse_args()
-
-pProfiles = args.pProfiles
-pRegionList = args.pregion
-pDefaultOnly = args.pDefaultOnly
-verbose = args.loglevel
-logging.basicConfig(level=args.loglevel, format="[%(filename)s:%(lineno)s:%(levelname)s - %(funcName)30s() ] %(message)s")
-
-SkipProfiles = ["default", "Shared-Fid"]
 
 ##########################
-ERASE_LINE = '\x1b[2K'
+def parse_args(args):
+	"""
+	Description: Parses the arguments passed into the script
+	@param args: args represents the list of arguments passed in
+	@return: returns an object namespace that contains the individualized parameters passed in
+	"""
+	parser = CommonArguments()
+	parser.my_parser.description = "We're going to find all vpcs within any of the accounts and regions we have access to, given the profile(s) provided."
+	parser.multiprofile()
+	parser.multiregion()
+	parser.extendedargs()
+	parser.rolestouse()
+	parser.rootOnly()
+	parser.timing()
+	parser.save_to_file()
+	parser.verbosity()
+	parser.version(__version__)
+	parser.my_parser.add_argument(
+		"--default",
+		dest="pDefault",
+		metavar="Looking for default VPCs only",
+		action="store_const",
+		default=False,
+		const=True,
+		help="Flag to determine whether we're looking for default VPCs only.")
+	return parser.my_parser.parse_args(args)
 
-print()
-fmt = '%-20s %-10s %-21s %-20s %-12s %-10s'
-print(fmt % ("Profile", "Region", "Vpc ID", "CIDR", "Is Default?", "Vpc Name"))
-print(fmt % ("-------", "------", "------", "----", "-----------", "--------"))
-ProfileList = Inventory_Modules.get_profiles(SkipProfiles, pProfiles)
-RegionList = Inventory_Modules.get_ec2_regions(ProfileList[0], pRegionList)
 
-logging.info(f"# of Regions: {len(RegionList)}")
-logging.info(f"# of Profiles: {len(ProfileList)}")
+def find_all_vpcs(fAllCredentials, fDefaultOnly=False):
+	"""
+	Note that this function takes a list of stack set names and finds the stack instances within them
+	"""
 
-Vpcs = {}
-NumVpcsFound = 0
-for region in RegionList:
-	for profile in ProfileList:
+	# This function is called
+	class FindVPCs(Thread):
+
+		def __init__(self, queue):
+			Thread.__init__(self)
+			self.queue = queue
+
+		def run(self):
+			while True:
+				# Get the work from the queue and expand the tuple
+				c_account_credentials, c_default, c_PlaceCount = self.queue.get()
+				logging.info(f"De-queued info for account number {c_account_credentials['AccountId']}")
+				try:
+					# Now go through those stacksets and determine the instances, made up of accounts and regions
+					Vpcs = Inventory_Modules.find_account_vpcs2(c_account_credentials, c_default)
+					logging.info(f"Account: {c_account_credentials['AccountId']} Region: {c_account_credentials['Region']} | Found {len(Vpcs['Vpcs'])} VPCs")
+					if 'Vpcs' in Vpcs.keys() and len(Vpcs['Vpcs']) > 0:
+						for y in range(len(Vpcs['Vpcs'])):
+							VpcName = "No name defined"
+							VpcId = Vpcs['Vpcs'][y]['VpcId']
+							IsDefault = Vpcs['Vpcs'][y]['IsDefault']
+							CIDRBlockAssociationSet = Vpcs['Vpcs'][y]['CidrBlockAssociationSet']
+							if 'Tags' in Vpcs['Vpcs'][y]:
+								for z in range(len(Vpcs['Vpcs'][y]['Tags'])):
+									if Vpcs['Vpcs'][y]['Tags'][z]['Key'] == "Name":
+										VpcName = Vpcs['Vpcs'][y]['Tags'][z]['Value']
+							# This is needed to accommodate the possibility that there are multiple CIDRs associated with a given VPC.
+							for _ in range(len(CIDRBlockAssociationSet)):
+								AllVPCs.append({'MgmtAccount': c_account_credentials['MgmtAccount'],
+								                'AccountId'  : c_account_credentials['AccountId'],
+								                'Region'     : c_account_credentials['Region'],
+								                'CIDR'       : CIDRBlockAssociationSet[_]['CidrBlock'],
+								                'VpcId'      : VpcId,
+								                'IsDefault'  : IsDefault,
+								                'VpcName'    : VpcName})
+					else:
+						continue
+				except KeyError as my_Error:
+					logging.error(f"Account Access failed - trying to access {c_account_credentials['AccountId']} in region {c_account_credentials['Region']}")
+					logging.info(f"Actual Error: {my_Error}")
+					pass
+				except AttributeError as my_Error:
+					logging.error(f"Error: Likely that one of the supplied profiles was wrong")
+					logging.warning(my_Error)
+					continue
+				except ClientError as my_Error:
+					if "AuthFailure" in str(my_Error):
+						logging.error(f"Authorization Failure accessing account {c_account_credentials['AccountId']} in {c_account_credentials['Region']} region")
+						logging.warning(f"It's possible that the region {c_account_credentials['Region']} hasn't been opted-into")
+						continue
+					else:
+						logging.error(f"Error: Likely throttling errors from too much activity")
+						logging.warning(my_Error)
+						continue
+
+				finally:
+					print(".", end='')
+					self.queue.task_done()
+
+	###########
+
+	checkqueue = Queue()
+
+	AllVPCs = []
+	PlaceCount = 0
+	WorkerThreads = min(len(fAllCredentials), 25)
+
+	for x in range(WorkerThreads):
+		worker = FindVPCs(checkqueue)
+		# Setting daemon to True will let the main thread exit even though the workers are blocking
+		worker.daemon = True
+		worker.start()
+
+	for credential in fAllCredentials:
+		logging.info(f"Beginning to queue data - starting with {credential['AccountId']}")
+		print(f"{ERASE_LINE}Checking {credential['AccountId']} in region {credential['Region']} - {PlaceCount + 1} / {len(fAllCredentials)}", end='\r')
+		# for region in fRegionList:
 		try:
-			Vpcs = Inventory_Modules.find_profile_vpcs(profile, region, pDefaultOnly)
-			logging.info(f"Info - Profile {profile} | Region {region} | Found {len(Vpcs)} vpcs")
-			VpcNum = len(Vpcs['Vpcs']) if 'Vpcs' in Vpcs else 0
-			print(f"{ERASE_LINE}Profile: {profile} | Region: {region} | Found {VpcNum} Vpcs", end='\r')
+			# I don't know why - but double parens are necessary below. If you remove them, only the first parameter is queued.
+			checkqueue.put((credential, fDefaultOnly, PlaceCount))
+			logging.info(f"Put credential: {credential}, Default: {fDefaultOnly}")
+			PlaceCount += 1
 		except ClientError as my_Error:
-			if str(my_Error).find("AuthFailure") > 0:
-				print(f"{profile}: Authorization Failure connecting to {region}")
-			pass
-		except TypeError as my_Error:
-			print(my_Error)
-			logging.info("There was an error")
-			pass
-		if 'Vpcs' in Vpcs.keys():  # If there are no VPCs, you can't reference the index
-			logging.info(f"Displaying profile {profile}")
-			VpcName = "No name defined"
-			for vpc in Vpcs['Vpcs']:
-				VpcId = vpc['VpcId']
-				IsDefault = vpc['IsDefault']
-				CIDR = vpc['CidrBlock']
-				if 'Tags' in vpc:
-					logging.debug("Looking for tags")
-					for tag in vpc['Tags']:
-						if tag['Key'] == "Name":
-							VpcName = tag['Value']
-				print(fmt % (profile, region, VpcId, CIDR, IsDefault, VpcName))
-				NumVpcsFound += 1
-		else:
-			continue
+			if "AuthFailure" in str(my_Error):
+				logging.error(f"Authorization Failure accessing account {credential['AccountId']} in {credential['Region']} region")
+				logging.warning(f"It's possible that the region {credential['Region']} hasn't been opted-into")
+				pass
+	checkqueue.join()
+	return AllVPCs
 
-print(ERASE_LINE)
-print(f"Found {NumVpcsFound} Vpcs across {len(ProfileList)} profiles across {len(RegionList)} regions")
-print("Thank you for using this script")
-print()
+
+##########################
+if __name__ == '__main__':
+	args = parse_args(sys.argv[1:])
+	pProfiles = args.Profiles
+	pRegionList = args.Regions
+	pAccounts = args.Accounts
+	pRoles = args.AccessRoles
+	pSkipProfiles = args.SkipProfiles
+	pSkipAccounts = args.SkipAccounts
+	pRootOnly = args.RootOnly
+	pTiming = args.Time
+	pFilename = args.Filename
+	pDefault = args.pDefault
+	verbose = args.loglevel
+	logging.basicConfig(level=verbose, format="[%(filename)s:%(lineno)s - %(funcName)30s() ] %(message)s")
+
+	ERASE_LINE = '\x1b[2K'
+
+	begin_time = time()
+
+	NumVpcsFound = 0
+	NumRegions = 0
+	if pProfiles is not None:
+		print(f"Checking for VPCs in profile{'s' if len(pProfiles) > 1 else ''} {pProfiles}")
+	else:
+		print(f"Checking for VPCs in default profile")
+
+	# NumOfRootProfiles = 0
+	# Get credentials
+	AllCredentials = get_all_credentials(pProfiles, pTiming, pSkipProfiles, pSkipAccounts, pRootOnly, pAccounts, pRegionList, pRoles)
+	AllRegionsList = list(set([x['Region'] for x in AllCredentials]))
+	AllAccountList = list(set([x['AccountId'] for x in AllCredentials]))
+	# Find the VPCs
+	All_VPCs_Found = find_all_vpcs(AllCredentials, pDefault)
+	# Display results
+	display_dict = {'MgmtAccount': {'DisplayOrder': 1, 'Heading': 'Mgmt Acct'},
+	                'AccountId'  : {'DisplayOrder': 2, 'Heading': 'Acct Number'},
+	                'Region'     : {'DisplayOrder': 3, 'Heading': 'Region'},
+	                'VpcName'    : {'DisplayOrder': 4, 'Heading': 'VPC Name'},
+	                'CIDR'       : {'DisplayOrder': 5, 'Heading': 'CIDR Block'},
+	                'IsDefault'  : {'DisplayOrder': 6, 'Heading': 'Default VPC', 'Condition': [True, 1, '1']},
+	                'VpcId'      : {'DisplayOrder': 7, 'Heading': 'VPC Id'}}
+
+	logging.info(f"# of Regions: {len(AllRegionsList)}")
+	# logging.info(f"# of Management Accounts: {NumOfRootProfiles}")
+	logging.info(f"# of Child Accounts: {len(AllAccountList)}")
+
+	sorted_AllVPCs = sorted(All_VPCs_Found, key=lambda d: (d['MgmtAccount'], d['AccountId'], d['Region'], d['VpcName'], d['CIDR']))
+	print()
+	display_results(sorted_AllVPCs, display_dict, None, pFilename)
+
+	if pTiming:
+		print(ERASE_LINE)
+		print(f"{Fore.GREEN}This script took {time() - begin_time:.2f} seconds{Fore.RESET}")
+	print(ERASE_LINE)
+	# Had to do this, because some of the VPCs that show up in the "sorted_AllVPCs" list are actually the same VPC, with a different CIDR range.
+	Num_of_unique_VPCs = len(set([x['VpcId'] for x in sorted_AllVPCs]))
+	print(f"Found {Num_of_unique_VPCs}{' default' if pDefault else ''} Vpcs across {len(AllAccountList)} accounts across {len(AllRegionsList)} regions")
+	print()
+	print("Thank you for using this script.")
+	print()

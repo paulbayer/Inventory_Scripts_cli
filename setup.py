@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
 	name='inv_scr',  # Update Name
-	packages=['inv_scr'],  # Name of CLI
+	packages=['inv_scr', 'inv_scr.core', 'inv_scr.operations'],  # Name of CLI
 	version='0.1.0',  # Version
 	description='A cli for Inventory Scripts',  # Description
 	author='Paul Bayer',  # Author
@@ -12,16 +12,20 @@ setup(
 	keywords=['aws', 'python', 'inventory', 'readiness', 'cloud', 'maturity'],  # Key words for cli
 	classifiers=[],
 	install_requires=[
-		"boto3",  # Add all packages
+		"boto3",
 		"colorama",
 		"botocore",
-		"logging"
+		"tqdm",
 		],
 	setup_requires=[],
-	tests_require=[],
+	tests_require=[
+		"unittest2",
+		"mock",
+		"coverage",
+		],
 	entry_points={
 		'console_scripts': [
-			'inv_scr = inv_scr.__main__:main',
+			'inv_scr = inv_scr.cli:main',
 			],
 		},
 	)

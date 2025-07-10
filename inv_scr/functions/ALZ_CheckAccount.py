@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 
 import sys
-
-import boto3
-
 import Inventory_Modules
 import vpc_modules
 from colorama import init, Fore
@@ -14,10 +11,12 @@ from prettytable import PrettyTable
 import logging
 
 init()
+__version__ = "2023.05.04"
 
 parser = CommonArguments()
-parser.verbosity()
 parser.singleprofile()
+parser.verbosity()
+parser.version(__version__)
 parser.my_parser.add_argument(
 		"--explain",
 		dest="pExplain",
@@ -67,7 +66,7 @@ args = parser.my_parser.parse_args()
 
 Quick = args.Quick
 pProfile = args.Profile
-pChildAccountId = args.pChildAccountId
+pChildAccountId = args.pChildAccountList
 verbose = args.loglevel
 pRole = args.Role
 FixRun = args.FixRun
@@ -134,7 +133,7 @@ def _initdict(StepCount, faccountList):
 			fProcessStatus[account][Step]['Success'] = False
 			fProcessStatus[account][Step]['IssuesFound'] = 0
 			fProcessStatus[account][Step]['IssuesFixed'] = 0
-	return (fProcessStatus)
+	return fProcessStatus
 
 
 ###########
@@ -214,7 +213,7 @@ for childaccount in ChildAccountList:
 	try:
 		account_credentials = Inventory_Modules.get_child_access3(aws_account, childaccount)
 	except ClientError as my_Error:
-		if str(my_Error).find("AuthFailure") > 0:
+		if "AuthFailure" in str(my_Error):
 			# TODO: This whole section is waiting on an enhancement. Until then, we have to assume that ProServe or someone familiar with ALZ is running this script
 			print(f"Authorization Failure for account {childaccount}")
 			print(
@@ -267,7 +266,7 @@ for childaccount in ChildAccountList:
 			      f"Checking account {childaccount} in region {region} for {Fore.RED}default VPCs{Fore.RESET}",
 			      end='\r')
 			logging.info("Looking for Default VPCs in account {} from Region {}}", childaccount, region)
-			DefaultVPC = Inventory_Modules.find_account_vpcs2(account_credentials, region, True)
+			DefaultVPC = Inventory_Modules.find_account_vpcs2(account_credentials, True)
 			if len(DefaultVPC['Vpcs']) > 0:
 				DefaultVPCs.append({
 					'VPCId'    : DefaultVPC['Vpcs'][0]['VpcId'],
@@ -325,7 +324,7 @@ for childaccount in ChildAccountList:
 		print(
 			f"{ERASE_LINE + Fore.GREEN}** Step 1 found {ProcessStatus[childaccount]['Step1']['IssuesFound']} issues, but they were fixed by deleting the default vpcs{Fore.RESET}")
 		ProcessStatus[childaccount]['Step1']['Success'] = True
-	elif (ProcessStatus[childaccount]['Step1']['IssuesFound'] > ProcessStatus[childaccount]['Step1']['IssuesFixed']):
+	elif ProcessStatus[childaccount]['Step1']['IssuesFound'] > ProcessStatus[childaccount]['Step1']['IssuesFixed']:
 		print(
 			f"{ERASE_LINE + Fore.RED}** Step 1 completed, but there were {ProcessStatus[childaccount]['Step1']['IssuesFound'] - ProcessStatus[childaccount]['Step1']['IssuesFixed']} vpcs that couldn't be fixed{Fore.RESET}")
 	else:
@@ -404,7 +403,7 @@ for childaccount in ChildAccountList:
 		print(
 			f"{ERASE_LINE + Fore.GREEN}** Step 2 found {ProcessStatus[childaccount]['Step2']['IssuesFound']} issues, but they were fixed by deleting the existing Config Recorders and Delivery Channels{Fore.RESET}")
 		ProcessStatus[childaccount]['Step2']['Success'] = True
-	elif (ProcessStatus[childaccount]['Step2']['IssuesFound'] > ProcessStatus[childaccount]['Step2']['IssuesFixed']):
+	elif ProcessStatus[childaccount]['Step2']['IssuesFound'] > ProcessStatus[childaccount]['Step2']['IssuesFixed']:
 		print(
 			f"{ERASE_LINE + Fore.RED}** Step 2 completed, but there were {ProcessStatus[childaccount]['Step2']['IssuesFound'] - ProcessStatus[childaccount]['Step2']['IssuesFixed']} items found that couldn't be deleted{Fore.RESET}")
 	else:
@@ -455,7 +454,7 @@ for childaccount in ChildAccountList:
 		print(
 			f"{ERASE_LINE + Fore.GREEN}** Step 3 found {ProcessStatus[childaccount]['Step3']['IssuesFound']} issues, but they were fixed by deleting the existing CloudTrail trail names{Fore.RESET}")
 		ProcessStatus[childaccount]['Step3']['Success'] = True
-	elif (ProcessStatus[childaccount]['Step3']['IssuesFound'] > ProcessStatus[childaccount]['Step3']['IssuesFixed']):
+	elif ProcessStatus[childaccount]['Step3']['IssuesFound'] > ProcessStatus[childaccount]['Step3']['IssuesFixed']:
 		print(
 			f"{ERASE_LINE + Fore.RED}** Step 3 completed, but there were {ProcessStatus[childaccount]['Step3']['IssuesFound'] - ProcessStatus[childaccount]['Step3']['IssuesFixed']} trail names found that couldn't be deleted{Fore.RESET}")
 	else:
@@ -514,7 +513,7 @@ for childaccount in ChildAccountList:
 		print(
 			f"{ERASE_LINE + Fore.GREEN}** Step 4 found {ProcessStatus[childaccount]['Step4']['IssuesFound']} guardduty invites, but they were deleted{Fore.RESET}")
 		ProcessStatus[childaccount]['Step4']['Success'] = True
-	elif (ProcessStatus[childaccount]['Step4']['IssuesFound'] > ProcessStatus[childaccount]['Step4']['IssuesFixed']):
+	elif ProcessStatus[childaccount]['Step4']['IssuesFound'] > ProcessStatus[childaccount]['Step4']['IssuesFixed']:
 		print(
 			f"{ERASE_LINE + Fore.RED}** Step 4 completed, but there were {ProcessStatus[childaccount]['Step4']['IssuesFound'] - ProcessStatus[childaccount]['Step4']['IssuesFixed']} guardduty invites found that couldn't be deleted{Fore.RESET}")
 	else:
@@ -533,7 +532,7 @@ for childaccount in ChildAccountList:
 	- If the existing account will be a child account in the Organization, use the AVM launch template through Service Catalog and enter the appropriate configuration parameters.
 	'''
 	print("Checking that the account is part of the AWS Organization.")
-	if (childaccount in [d['AccountId'] for d in aws_account.ChildAccounts]):
+	if childaccount in [d['AccountId'] for d in aws_account.ChildAccounts]:
 		ProcessStatus[childaccount]['Step5']['Success'] = True
 	else:
 		print()
@@ -549,7 +548,7 @@ for childaccount in ChildAccountList:
 		print(
 			f"{ERASE_LINE + Fore.GREEN}** Step 5 found {ProcessStatus[childaccount]['Step5']['IssuesFound']} issues, but we were able to move the account into the they were able to be fixed{Fore.RESET}")
 		ProcessStatus[childaccount]['Step5']['Success'] = True
-	elif (ProcessStatus[childaccount]['Step5']['IssuesFound'] > ProcessStatus[childaccount]['Step5']['IssuesFixed']):
+	elif ProcessStatus[childaccount]['Step5']['IssuesFound'] > ProcessStatus[childaccount]['Step5']['IssuesFixed']:
 		print(
 			f"{ERASE_LINE + Fore.RED}** Step 5 completed, but there were {ProcessStatus[childaccount]['Step5']['IssuesFound'] - ProcessStatus[childaccount]['Step5']['IssuesFixed']} blockers found that couldn't be fixed{Fore.RESET}")
 	else:

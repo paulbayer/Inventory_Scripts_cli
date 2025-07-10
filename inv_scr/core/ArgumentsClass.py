@@ -15,9 +15,12 @@ How to use:
 	verbose = args.loglevel
 
 """
+__version__ = "2024.09.24"
+
+import os
 
 
-class CommonArguments():
+class CommonArguments:
 	"""
 	Class is created on the argparse class, and extends it for my purposes.
 	"""
@@ -29,20 +32,62 @@ class CommonArguments():
 				allow_abbrev=True,
 				prefix_chars='-+')
 
-	def version(self):
+	def version(self, script_version):
 		self.my_parser.add_argument(
-				"--version",
-				dest="Version",
-				action="store_true",
-				default="store_false",  # Defaults to not providing the version
-				help="Version #")
+			"--version",
+			help="Version #",
+			action="version",
+			version=f"Version: {script_version}")
 
 	def rootOnly(self):
 		self.my_parser.add_argument(
-				"--rootonly",
-				dest="RootOnly",
-				action="store_true",  # Defaults to False, so the script would continue to run
-				help="Only run this code for the root account, not the children")
+			"--rootonly",
+			dest="RootOnly",
+			action="store_true",  # Defaults to False, so the script would continue to run
+			help="Only run this code for the root account, not the children")
+
+	def roletouse(self):
+		self.my_parser.add_argument(
+			"--access_rolename",
+			dest="AccessRole",
+			default=None,
+			metavar="role to use for access to child accounts",
+			help="This parameter specifies the single role that will allow this script to have access to the children accounts.")
+
+	def rolestouse(self):
+		self.my_parser.add_argument(
+			"--access_rolename",
+			dest="AccessRoles",
+			nargs='*',
+			default=None,
+			metavar="roles to use for access to child accounts",
+			help="This parameter specifies the list of roles that will allow this script to have access to the children accounts.")
+
+	def deletion(self):
+		# self.my_parser.add_argument(
+		# 	"+forreal",
+		# 	help="By default, we report results without changing anything. If you want to remediate or change your environment - include this parameter",
+		# 	action="store_false",
+		# 	dest="DryRun")              # Default to Dry Run (no changes)
+		self.my_parser.add_argument(
+			"+force",
+			help="To force a change - despite indications to the contrary",
+			action="store_true",
+			dest="Force")  # Default to Dry Run (no changes)
+
+	def confirm(self):
+		self.my_parser.add_argument(
+			"+confirm",
+			help="To skip confirmation of a change",
+			action="store_true",
+			dest="Confirm")  # Default to Dry Run (no changes)
+
+	def fix(self):
+		self.my_parser.add_argument(
+			"+fix",
+			help="To intrusively fix something in your accounts",
+			action="store_true",
+			dest="Fix")
 
 	def verbosity(self):
 		import logging
@@ -76,32 +121,48 @@ class CommonArguments():
 				default=logging.CRITICAL)  # args.loglevel = 50
 
 	def extendedargs(self):
-		# self.my_parser.add_argument(
-		# 	"+forreal",
-		# 	help="By default, we report results without changing anything. If you want to remediate or change your environment - include this parameter",
-		# 	action="store_false",
-		# 	dest="DryRun")              # Default to Dry Run (no changes)
 		self.my_parser.add_argument(
-			"--force", "+force",
-			help="To force a change - despite indications to the contrary",
-			action="store_true",
-			dest="Force")  # Default to Dry Run (no changes)
-		self.my_parser.add_argument(
-			"-k", "--skip",
+			"-k", "-ka", "--skip", "--skipaccount", "--skipaccounts",
 			dest="SkipAccounts",
 			nargs="*",
 			metavar="Accounts to leave alone",
-			default=[],
+			default=None,
 			help="These are the account numbers you don't want to screw with. Likely the core accounts.")
+		self.my_parser.add_argument(
+			"-kp", "--skipprofile", "--skipprofiles",
+			dest="SkipProfiles",
+			nargs="*",
+			metavar="Profile names",
+			default=None,
+			help="These are the profiles you don't want to examine. You can specify 'skipplus' to skip over all profiles using a plus in them.")
+		self.my_parser.add_argument(
+			"-a", "--account",
+			dest="Accounts",
+			default=None,
+			nargs="*",
+			metavar="Account",
+			help="Just the accounts you want to check")
+
+	def timing(self):
+		self.my_parser.add_argument(
+			"--timing", "--time",
+			dest="Time",
+			action="store_true",
+			help="Use this parameter to add a timing for the scripts")
 
 	def fragment(self):
 		self.my_parser.add_argument(
 			"-f", "--fragment",
-			dest="Fragment",
+			dest="Fragments",
 			nargs='*',
-			metavar="CloudFormation stack fragment",
+			metavar="string fragment",
 			default=["all"],
-			help="List of fragments of the cloudformation stackset(s) you want to check for.")
+			help="List of fragments of the string(s) you want to check for.")
+		self.my_parser.add_argument(
+			"-e", "--exact",
+			dest="Exact",
+			action="store_true",
+			help="Use this flag to make sure that ONLY the string you specified will be identified")
 
 	def singleprofile(self):
 		self.my_parser.add_argument(
@@ -109,7 +170,7 @@ class CommonArguments():
 				dest="Profile",
 				metavar="Profile",
 				default=None,  # Default to boto3 defaults
-				help="Which single profile do you want to run against?")
+				help="Which *single* profile do you want to run against?")
 
 	def multiprofile(self):
 		self.my_parser.add_argument(
@@ -126,8 +187,10 @@ class CommonArguments():
 				nargs="*",
 				dest="Regions",
 				metavar="region name string",
-				default=["us-east-1"],
-				help="String fragment of the region(s) you want to check for resources. You can supply multiple fragments.")
+				# default=["us-east-1"],
+				default=[os.getenv("AWS_DEFAULT_REGION","us-east-1")],
+				help="String fragment of the region(s) you want to check for resources. You can supply multiple fragments.\n"
+				     "Use 'all' for everything you've opted into, and 'global' for everything, regardless of opted-in status")
 
 	def multiregion_nodefault(self):
 		self.my_parser.add_argument(
@@ -144,4 +207,20 @@ class CommonArguments():
 				dest="Region",
 				metavar="region name string",
 				default="us-east-1",
-				help="Name of the single region(s) you want to check for resources.")
+				help="Name of the *single* region you want to check for resources.")
+
+	def singleregion_nodefault(self):
+		self.my_parser.add_argument(
+				"-r", "--region",
+				dest="Region",
+				metavar="region name string",
+				default=None,
+				help="Name of the *single* region you want to check for resources.")
+
+	def save_to_file(self):
+		self.my_parser.add_argument(
+			"--filename",
+			dest="Filename",
+			metavar="filename",
+			default=None,
+			help="Name of the filename you want to save results to.")

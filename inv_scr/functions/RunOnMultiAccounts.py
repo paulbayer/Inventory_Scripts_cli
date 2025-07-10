@@ -10,10 +10,12 @@ from colorama import init, Fore
 from botocore.exceptions import ClientError
 
 init()
+__version__ = "2023.05.04"
+
 parser = CommonArguments()
-parser.version()
 parser.singleprofile()
 parser.verbosity()          # Allows for the verbosity to be handled.
+parser.version(__version__)
 parser.my_parser.add_argument(
 	"-f", "--file",
 	dest="pAccountFile",
@@ -45,34 +47,34 @@ def check_account_access(faws_acct, faccount_num, fAccessRole=None):
 	if fAccessRole is None:
 		logging.error(f"Role must be provided")
 		return_response = {'Success': False, 'ErrorMessage': "Role wasn't provided"}
-		return(return_response)
+		return return_response
 	sts_client = faws_acct.session.client('sts')
 	try:
 		role_arn = f"arn:aws:iam::{faccount_num}:role/{fAccessRole}"
 		credentials = sts_client.assume_role(RoleArn=role_arn,
 		                                  RoleSessionName='TheOtherGuy')['Credentials']
 		return_response = {'Credentials': credentials, 'Success': True, 'ErrorMessage': ""}
-		return(return_response)
+		return return_response
 	except ClientError as my_Error:
 		print(f"Client Error: {my_Error}")
 		return_response = {'Success': False, 'ErrorMessage': "Client Error"}
-		return(return_response)
+		return return_response
 	except sts_client.exceptions.MalformedPolicyDocumentException as my_Error:
 		print(f"MalformedPolicy: {my_Error}")
 		return_response = {'Success': False, 'ErrorMessage': "Malformed Policy"}
-		return(return_response)
+		return return_response
 	except sts_client.exceptions.PackedPolicyTooLargeException as my_Error:
 		print(f"Policy is too large: {my_Error}")
 		return_response = {'Success': False, 'ErrorMessage': "Policy is too large"}
-		return(return_response)
+		return return_response
 	except sts_client.exceptions.RegionDisabledException as my_Error:
 		print(f"Region is disabled: {my_Error}")
 		return_response = {'Success': False, 'ErrorMessage': "Region Disabled"}
-		return(return_response)
+		return return_response
 	except sts_client.exceptions.ExpiredTokenException as my_Error:
 		print(f"Expired Token: {my_Error}")
 		return_response = {'Success': False, 'ErrorMessage': "Expired Token"}
-		return(return_response)
+		return return_response
 
 
 def participant_user(faws_acct, create=None, username=None):
@@ -115,11 +117,11 @@ def participant_user(faws_acct, create=None, username=None):
 				return_response = {'Success': True, 'AccountId': faws_acct.acct_number,
 				                   'User'   : username, 'Password': password}
 			except ClientError as my_Error:
-				ErrorMessage = (f"Client Error: {my_Error}")
+				ErrorMessage = f"Client Error: {my_Error}"
 				logging.error(f"ErrorMessage: {ErrorMessage}")
 				return_response = {'Success': False, 'ErrorMessage': ErrorMessage}
 		except ClientError as my_Error:
-			ErrorMessage = (f"Client Error: {my_Error}")
+			ErrorMessage = f"Client Error: {my_Error}"
 			logging.error(f"ErrorMessage: {ErrorMessage}")
 			return_response = {'Success': False, 'ErrorMessage': ErrorMessage}
 		try:
@@ -129,7 +131,7 @@ def participant_user(faws_acct, create=None, username=None):
 		except (ClientError, client_iam.exceptions.NoSuchEntityException,
 		        client_iam.exceptions.LimitExceededException,
 		        client_iam.exceptions.ServiceFailureException) as my_Error:
-			ErrorMessage = (f"Client Error: {my_Error}")
+			ErrorMessage = f"Client Error: {my_Error}"
 			logging.error(f"ErrorMessage: {ErrorMessage}")
 			return_response['Success'] = False
 			return_response['ErrorMessage'] = ErrorMessage
@@ -143,12 +145,23 @@ def participant_user(faws_acct, create=None, username=None):
 		        client_iam.exceptions.PasswordPolicyViolationException,
 		        client_iam.exceptions.LimitExceededException,
 		        client_iam.exceptions.ServiceFailureException) as my_Error:
-			ErrorMessage = (f"Specific Error: {my_Error}")
+			ErrorMessage = f"Specific Error: {my_Error}"
 			logging.error(f"ErrorMessage: {ErrorMessage}")
 			return_response['Success'] = False
 			return_response['ErrorMessage'] = ErrorMessage
-	return (return_response)
+	return return_response
 
+
+def display_firewall_manager(ocredentials):
+	"""
+	Description: Determine if firewall manager is running in this account
+	@param ocredentials: Credentials
+	@return:
+	"""
+	child_acct = aws_acct_access(ocredentials=ocredentials)
+	fw_mgr_client = child_acct.session.client('fms')
+	# response = fw_mgr_client.
+	# response =
 #####################
 
 
@@ -171,6 +184,7 @@ for account_num in Accounts:
 		Put more commands here... Or you can write functions that represent your commands and call them from here.
 		"""
 		credentials = Inventory_Modules.get_child_access3(aws_acct, account_num, 'us-east-1', ['reinvent-Admin'])
+		display_firewall_manager(credentials)
 		tgt_aws_access = aws_acct_access(ocredentials=credentials)
 		username = 'Paul'
 		user_response = participant_user(tgt_aws_access, username=username)

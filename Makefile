@@ -22,7 +22,46 @@ run: venv
 	cli_skeleton
 
 test: install
-# 	cli_skeleton --help # Example test to run
+	inv_scr list
+	inv_scr --help
+	inv_scr instances --help
+
+unittest: install
+	python3 -m unittest discover tests -v
+
+test-cli:
+	python3 tests/test_cli.py
+
+test-operations:
+	python3 tests/test_operations.py
+
+test-core:
+	python3 tests/test_core.py
+
+test-integration:
+	python3 tests/test_integration.py
+
+test-args:
+	python3 tests/test_argument_parsing.py
+
+test-all: unittest
+
+coverage: install
+	python3 -m coverage run -m unittest discover tests
+	python3 -m coverage report
+	python3 -m coverage html
+
+test-runner:
+	python3 tests/test_runner.py
+
+test-quick:
+	python3 -m unittest tests.test_cli.TestCLI.test_operations_mapping_exists tests.test_operations.TestInstancesOperation.test_run_function_exists tests.test_argument_parsing.TestArgumentParsing.test_verbosity_levels -v
+
+validate:
+	python3 validate_tests.py
+
+test-versions:
+	python3 test_operation_versions.py
 
 clean:
 	rm -rf $(VENV)

@@ -1,24 +1,22 @@
 #!/usr/bin/env python3
 
-import os
-import sys
-import pprint
-import boto3
+
 import Inventory_Modules
-import pprint
 from ArgumentsClass import CommonArguments
 from account_class import aws_acct_access
-from colorama import init, Fore, Back, Style
-from botocore.exceptions import ClientError, NoCredentialsError
+from colorama import init, Fore
+from botocore.exceptions import ClientError
 
 import logging
 
 init()
+__version__ = "2023.05.04"
 
 parser = CommonArguments()
-parser.verbosity()
 parser.singleprofile()
 parser.multiregion()
+parser.verbosity()
+parser.version(__version__)
 
 # UsageMsg="You can provide a level to determine whether this script considers only the 'credentials' file, the 'config' file, or both."
 parser.my_parser.add_argument(
@@ -44,12 +42,16 @@ args = parser.my_parser.parse_args()
 
 pProfile = args.Profile
 pRegionList = args.Regions
-pstackfrag = args.pstackfrag
+pstackfrag = args.pFragments
 pstatus = args.pstatus
 AccountsToSkip = args.pSkipAccounts
 verbose = args.loglevel
-logging.basicConfig(level=args.loglevel,
-                    format="[%(filename)s:%(lineno)s:%(levelname)s - %(funcName)30s() ] %(message)s")
+# Setup logging levels
+logging.basicConfig(level=verbose, format="[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s")
+logging.getLogger("boto3").setLevel(logging.CRITICAL)
+logging.getLogger("botocore").setLevel(logging.CRITICAL)
+logging.getLogger("s3transfer").setLevel(logging.CRITICAL)
+logging.getLogger("urllib3").setLevel(logging.CRITICAL)
 
 """
 We should eventually create an argument here that would check on the status of the drift-detection using
@@ -70,7 +72,7 @@ if aws_acct.AccountType == 'Root':
 	if answer == 'root':
 		ChildAccounts = aws_acct.ChildAccounts
 	else:
-		ChildAccounts = {'MgmntAccount' : aws_acct.acct_number,
+		ChildAccounts = {'MgmtAccount' : aws_acct.acct_number,
 		                 'AccountId'    : aws_acct.acct_number,
 		                 'AccountEmail' : aws_acct.MgmtEmail,
 		                 'AccountStatus': aws_acct.AccountStatus}
@@ -91,8 +93,11 @@ for account in ChildAccounts:
 	# logging.info(f"Role ARN: {role_arn}")
 	try:
 		account_credentials = Inventory_Modules.get_child_access3(aws_acct, account['AccountId'], )
+		if account_credentials['AccessError']:
+			logging.error(f"Accessing account {account['AccountId']} didn't work, so we're skipping it")
+			continue
 	except ClientError as my_Error:
-		if str(my_Error).find("AuthFailure") > 0:
+		if "AuthFailure" in str(my_Error):
 			print(f"{pProfile}: Authorization Failure for account {account['AccountId']}")
 		elif str(my_Error).find("AccessDenied") > 0:
 			print(f"{pProfile}: Access Denied Failure for account {account['AccountId']}")
@@ -101,6 +106,7 @@ for account in ChildAccounts:
 			print(my_Error)
 		break
 	for region in RegionList:
+		Stacks = []
 		try:
 			StackNum = 0
 			Stacks = Inventory_Modules.find_stacks2(account_credentials, region, pstackfrag, pstatus)
@@ -108,18 +114,17 @@ for account in ChildAccounts:
 			logging.info(
 				f"{ERASE_LINE}{Fore.RED}Account: {account['AccountId']} Region: {region} Found {StackNum} Stacks{Fore.RESET}")
 		except ClientError as my_Error:
-			if str(my_Error).find("AuthFailure") > 0:
+			if "AuthFailure" in str(my_Error):
 				print(f"{account['AccountId']}: Authorization Failure")
-		# TODO: Is there a better way to refer to "Stacks" if there are no stacks in the account?
-		if len(Stacks) > 0:
-			for y in range(len(Stacks)):
-				StackName = Stacks[y]['StackName']
-				StackStatus = Stacks[y]['StackStatus']
-				StackID = Stacks[y]['StackId']
-				DriftStatus = Inventory_Modules.enable_drift_on_stacks2(account_credentials, region, StackName)
-				logging.error(
-					f"Enabled drift detection on {StackName} in account {account_credentials['AccountNumber']} in region {region}")
-				NumStacksFound += 1
+		# if len(Stacks) > 0:
+		for Stack in Stacks:
+			StackName = Stack['StackName']
+			StackStatus = Stack['StackStatus']
+			StackID = Stack['StackId']
+			DriftStatus = Inventory_Modules.enable_drift_on_stacks2(account_credentials, region, StackName)
+			logging.error(
+				f"Enabled drift detection on {StackName} in account {account_credentials['AccountNumber']} in region {region}")
+			NumStacksFound += 1
 
 print(ERASE_LINE)
 print(f"{Fore.RED}Looked through {NumStacksFound} Stacks across {len(ChildAccounts)} accounts across "

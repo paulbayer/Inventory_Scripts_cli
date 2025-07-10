@@ -9,11 +9,13 @@ from botocore.exceptions import ClientError
 import simplejson as json
 
 import logging
+__version__ = "2023.05.04"
 
 parser = CommonArguments()
 parser.singleprofile()
 parser.singleregion()
 parser.verbosity()
+parser.version(__version__)
 parser.my_parser.add_argument(
 		"-R", "--access_rolename",
 		dest="pAccessRole",
@@ -197,7 +199,7 @@ for acct in aws_acct.ChildAccounts:
 			pass
 
 print(ERASE_LINE)
-print(f"We found {len(ChildAccounts)} accounts under your organization")
+print(f"We found {len(aws_acct.ChildAccounts)} accounts under your organization")
 if pLock and pFix:
 	print(f"We locked {TrustPoliciesChanged} Trust Policies")
 elif not pLock and pFix:

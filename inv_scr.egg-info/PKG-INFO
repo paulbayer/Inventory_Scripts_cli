@@ -1,15 +1,22 @@
-Metadata-Version: 2.1
-Name: inv-scr
+Metadata-Version: 2.4
+Name: inv_scr
 Version: 0.1.0
 Summary: A cli for Inventory Scripts
 Home-page: https://gitlab.aws.dev/paulbaye/inventory_scripts_cli
+Download-URL: https://gitlab.aws.dev/paulbaye/inventory_scripts_cli
 Author: Paul Bayer
 Author-email: paulbaye@amazon.com
-License: UNKNOWN
-Download-URL: https://gitlab.aws.dev/paulbaye/inventory_scripts_cli
 Keywords: aws,python,inventory,readiness,cloud,maturity
-Platform: UNKNOWN
 License-File: LICENSE
-
-UNKNOWN
-
+Requires-Dist: boto3
+Requires-Dist: colorama
+Requires-Dist: botocore
+Requires-Dist: tqdm
+Dynamic: author
+Dynamic: author-email
+Dynamic: download-url
+Dynamic: home-page
+Dynamic: keywords
+Dynamic: license-file
+Dynamic: requires-dist
+Dynamic: summary

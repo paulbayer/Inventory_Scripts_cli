@@ -1,3 +1,2 @@
 [console_scripts]
-inv_scr = inv_scr.__main__:main
-
+inv_scr = inv_scr.cli:main
