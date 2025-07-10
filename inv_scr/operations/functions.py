@@ -151,6 +151,7 @@ def run(args):
     pRuntime = getattr(args, 'pRuntime', None)
     
     print("Searching for Lambda functions...")
+    print(f"Operation version: {__version__}")
     print(f"Looking for functions with fragments: {Fore.RED}{pFragments}{Fore.RESET}")
     if pRuntime:
         print(f"Filtering by runtime: {Fore.RED}{pRuntime}{Fore.RESET}")
@@ -210,4 +211,3 @@ def run(args):
         timing.milestone("results_displayed", "Results formatted and displayed")
     
     print(f"\nFound {len(AllFunctions)} Lambda functions across {AccountNum} accounts and {RegionNum} regions")
-    print(f"Operation version: {__version__}")

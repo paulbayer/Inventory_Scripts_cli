@@ -131,6 +131,7 @@ def run(args):
         print(f"Searching for VPCs in profile{'s' if len(pProfiles) > 1 else ''} {pProfiles}")
     else:
         print("Searching for VPCs in default profile")
+    print(f"Operation version: {__version__}")
 
     if timing:
         timing.milestone("args_parsed", "Arguments parsed and validated")
@@ -178,4 +179,3 @@ def run(args):
     # Count unique VPCs (some may appear multiple times due to multiple CIDR ranges)
     Num_of_unique_VPCs = len(set([x['VpcId'] for x in sorted_AllVPCs]))
     print(f"Found {Num_of_unique_VPCs}{' default' if pDefault else ''} VPCs across {len(AllAccountList)} accounts and {len(AllRegionsList)} regions")
-    print(f"Operation version: {__version__}")

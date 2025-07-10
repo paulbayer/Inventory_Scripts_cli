@@ -158,6 +158,7 @@ def run(args):
     pStackId = getattr(args, 'pStackId', False)
     
     print("Searching for CloudFormation stacks...")
+    print(f"Operation version: {__version__}")
     print(f"Looking for stacks with fragments: {Fore.RED}{pFragments}{Fore.RESET}")
     if pExact:
         print(f"Using {Fore.RED}exact match{Fore.RESET} for stack names")
@@ -209,4 +210,3 @@ def run(args):
         timing.milestone("results_displayed", "Results formatted and displayed")
     
     print(f"\nFound {len(AllStacks)} CloudFormation stacks across {AccountNum} accounts and {RegionNum} regions")
-    print(f"Operation version: {__version__}")

@@ -128,6 +128,7 @@ def run(args):
     pInstanceCount = getattr(args, 'pInstanceCount', False)
     
     print("Searching for CloudFormation StackSets...")
+    print(f"Operation version: {__version__}")
     print(f"Looking for stacksets with fragments: {Fore.RED}{pFragments}{Fore.RESET}")
     print(f"Status filter: {Fore.RED}{pStatus}{Fore.RESET}")
     if pInstanceCount:
@@ -183,4 +184,3 @@ def run(args):
         timing.milestone("results_displayed", "Results formatted and displayed")
     
     print(f"\nFound {len(AllStackSets)} CloudFormation StackSets across {AccountNum} accounts and {RegionNum} regions")
-    print(f"Operation version: {__version__}")

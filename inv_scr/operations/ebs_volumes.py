@@ -135,6 +135,7 @@ def run(args):
     pExact = getattr(args, 'pExact', False)
     
     print("Searching for EBS volumes...")
+    print(f"Operation version: {__version__}")
     print(f"Looking for volumes with fragments: {Fore.RED}{pFragments}{Fore.RESET}")
     if pExact:
         print(f"Using {Fore.RED}exact match{Fore.RESET} for volume names")
@@ -204,5 +205,3 @@ def run(args):
     if len(orphaned_volumes) > 0:
         print(f"{Fore.RED}Found {len(orphaned_volumes)} volume{'s' if len(orphaned_volumes) != 1 else ''} that aren't attached to anything.")
         print(f"Th{'ese' if len(orphaned_volumes) != 1 else 'is'} {'are' if len(orphaned_volumes) != 1 else 'is'} likely orphaned, and should be considered for deletion to save costs.{Fore.RESET}")
-    
-    print(f"Operation version: {__version__}")

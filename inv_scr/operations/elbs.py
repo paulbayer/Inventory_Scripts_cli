@@ -149,6 +149,7 @@ def run(args):
     pStatus = getattr(args, 'pStatus', 'active')
     
     print("Searching for Elastic Load Balancers...")
+    print(f"Operation version: {__version__}")
     print(f"Looking for load balancers with fragments: {Fore.RED}{pFragments}{Fore.RESET}")
     print(f"Status filter: {Fore.RED}{pStatus}{Fore.RESET}")
     if pExact:
@@ -200,4 +201,3 @@ def run(args):
         timing.milestone("results_displayed", "Results formatted and displayed")
     
     print(f"\nFound {len(AllLoadBalancers)} Elastic Load Balancers across {AccountNum} accounts and {RegionNum} regions")
-    print(f"Operation version: {__version__}")

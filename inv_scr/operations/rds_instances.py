@@ -163,6 +163,7 @@ def run(args):
     pExact = getattr(args, 'pExact', False)
     
     print("Searching for RDS instances...")
+    print(f"Operation version: {__version__}")
     print(f"Looking for RDS instances with fragments: {Fore.RED}{pFragments}{Fore.RESET}")
     if pExact:
         print(f"Using {Fore.RED}exact match{Fore.RESET} for RDS instance names")
@@ -234,4 +235,3 @@ def run(args):
         print("State distribution:")
         for state, count in sorted(state_counts.items()):
             print(f"  - {state}: {count}")
-    print(f"Operation version: {__version__}")
