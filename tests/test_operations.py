@@ -576,7 +576,8 @@ class TestVPCsOperation(unittest.TestCase):
         mock_get_creds.return_value = mock_credentials
         
         # Mock different VPC responses for different accounts
-        def side_effect(credential):
+        # Note: find_account_vpcs2 takes (credential, defaultOnly) parameters
+        def side_effect(credential, default_only=False):
             account_id = credential['AccountId']
             if account_id == '123456789012':
                 return MockAWSResponseFixtures.vpc_response(num_vpcs=2)
@@ -978,12 +979,33 @@ class TestFunctionsOperation(unittest.TestCase):
         mock_credentials = MockCredentialFixtures.single_account_single_region()
         mock_get_creds.return_value = mock_credentials
         
-        # Use mock AWS response fixture
-        mock_aws_response = MockAWSResponseFixtures.lambda_functions_response(num_functions=3)
-        mock_find_account.return_value = mock_aws_response
+        # Use mock AWS response fixture - return list of functions directly
+        mock_functions_list = [
+            {
+                'FunctionName': 'test-function-0',
+                'Runtime': 'python3.9',
+                'Role': 'arn:aws:iam::123456789012:role/test-lambda-role-0',
+                'Handler': 'lambda_function.lambda_handler',
+                'CodeSize': 1024,
+                'Description': 'Test Lambda function 0',
+                'Timeout': 30,
+                'MemorySize': 128
+            },
+            {
+                'FunctionName': 'test-function-1',
+                'Runtime': 'nodejs18.x',
+                'Role': 'arn:aws:iam::123456789012:role/test-lambda-role-1',
+                'Handler': 'index.handler',
+                'CodeSize': 2048,
+                'Description': 'Test Lambda function 1',
+                'Timeout': 60,
+                'MemorySize': 256
+            }
+        ]
+        mock_find_account.return_value = mock_functions_list
         
         # Create mock args using helper
-        mock_args = MockOperationHelpers.create_mock_args(pRuntime=None)
+        mock_args = MockOperationHelpers.create_mock_args(pFragments=['all'], pRuntime=None)
         
         with patch('inv_scr.operations.functions.tqdm') as mock_tqdm:
             mock_pbar = MagicMock()
@@ -994,21 +1016,23 @@ class TestFunctionsOperation(unittest.TestCase):
         # Verify credential handling
         mock_get_creds.assert_called_once()
         
-        # Verify AWS API was called with correct credentials
-        mock_find_account.assert_called_once_with(mock_credentials[0])
+        # Verify AWS API was called with correct credentials, region, and fragments
+        mock_find_account.assert_called_once_with(mock_credentials[0], 'us-east-1', ['all'])
         
         # Verify display was called with processed results
         mock_display.assert_called_once()
         display_args = mock_display.call_args[0][0]
         
         # Verify data transformation logic
-        self.assertEqual(len(display_args), 3)  # Should have 3 functions
+        self.assertEqual(len(display_args), 2)  # Should have 2 functions
         for i, function in enumerate(display_args):
             self.assertEqual(function['AccountId'], '123456789012')
             self.assertEqual(function['Region'], 'us-east-1')
             self.assertEqual(function['FunctionName'], f'test-function-{i}')
             self.assertIn(function['Runtime'], ['python3.9', 'nodejs18.x'])
             self.assertEqual(function['ParentProfile'], 'test-profile')
+            # Verify role name extraction logic
+            self.assertEqual(function['Role'], f'test-lambda-role-{i}')
 
     @patch('inv_scr.operations.functions.get_all_credentials')
     @patch('inv_scr.operations.functions.Inventory_Modules.find_lambda_functions2')
@@ -1019,45 +1043,43 @@ class TestFunctionsOperation(unittest.TestCase):
         mock_credentials = MockCredentialFixtures.single_account_single_region()
         mock_get_creds.return_value = mock_credentials
         
-        # Create response with mixed runtimes
-        mock_aws_response = {
-            'Functions': [
-                {
-                    'FunctionName': 'python-function-1',
-                    'Runtime': 'python3.9',
-                    'Role': 'arn:aws:iam::123456789012:role/python-role',
-                    'Handler': 'lambda_function.lambda_handler',
-                    'CodeSize': 1024,
-                    'Description': 'Python function 1',
-                    'Timeout': 30,
-                    'MemorySize': 128
-                },
-                {
-                    'FunctionName': 'node-function-1',
-                    'Runtime': 'nodejs18.x',
-                    'Role': 'arn:aws:iam::123456789012:role/node-role',
-                    'Handler': 'index.handler',
-                    'CodeSize': 2048,
-                    'Description': 'Node.js function 1',
-                    'Timeout': 60,
-                    'MemorySize': 256
-                },
-                {
-                    'FunctionName': 'python-function-2',
-                    'Runtime': 'python3.11',
-                    'Role': 'arn:aws:iam::123456789012:role/python-role',
-                    'Handler': 'lambda_function.lambda_handler',
-                    'CodeSize': 1536,
-                    'Description': 'Python function 2',
-                    'Timeout': 45,
-                    'MemorySize': 512
-                }
-            ]
-        }
-        mock_find_account.return_value = mock_aws_response
+        # Create response with mixed runtimes - return list directly
+        mock_functions_list = [
+            {
+                'FunctionName': 'python-function-1',
+                'Runtime': 'python3.9',
+                'Role': 'arn:aws:iam::123456789012:role/python-role',
+                'Handler': 'lambda_function.lambda_handler',
+                'CodeSize': 1024,
+                'Description': 'Python function 1',
+                'Timeout': 30,
+                'MemorySize': 128
+            },
+            {
+                'FunctionName': 'node-function-1',
+                'Runtime': 'nodejs18.x',
+                'Role': 'arn:aws:iam::123456789012:role/node-role',
+                'Handler': 'index.handler',
+                'CodeSize': 2048,
+                'Description': 'Node.js function 1',
+                'Timeout': 60,
+                'MemorySize': 256
+            },
+            {
+                'FunctionName': 'python-function-2',
+                'Runtime': 'python3.11',
+                'Role': 'arn:aws:iam::123456789012:role/python-role-2',
+                'Handler': 'lambda_function.lambda_handler',
+                'CodeSize': 1536,
+                'Description': 'Python function 2',
+                'Timeout': 45,
+                'MemorySize': 512
+            }
+        ]
+        mock_find_account.return_value = mock_functions_list
         
         # Test filtering for Python runtime only
-        mock_args = MockOperationHelpers.create_mock_args(pRuntime='python')
+        mock_args = MockOperationHelpers.create_mock_args(pFragments=['all'], pRuntime=['python'])
         
         with patch('inv_scr.operations.functions.tqdm') as mock_tqdm:
             mock_pbar = MagicMock()
@@ -1065,15 +1087,21 @@ class TestFunctionsOperation(unittest.TestCase):
             
             functions.run(mock_args)
         
+        # Verify AWS API was called with correct parameters (fragments + runtime)
+        mock_find_account.assert_called_once_with(mock_credentials[0], 'us-east-1', ['all', 'python'])
+        
         # Verify display was called
         mock_display.assert_called_once()
         display_args = mock_display.call_args[0][0]
         
-        # Should only have Python functions (2 out of 3)
-        self.assertEqual(len(display_args), 2)
+        # Should have all 3 functions (filtering by runtime happens in the find_lambda_functions2 function)
+        self.assertEqual(len(display_args), 3)
         for function in display_args:
-            self.assertIn('python', function['Runtime'].lower())
-            self.assertIn(function['FunctionName'], ['python-function-1', 'python-function-2'])
+            self.assertEqual(function['AccountId'], '123456789012')
+            self.assertEqual(function['Region'], 'us-east-1')
+            self.assertEqual(function['ParentProfile'], 'test-profile')
+            # Verify role name extraction logic worked
+            self.assertNotIn('arn:aws:iam::', function['Role'])
 
 
 class TestOrgsOperation(unittest.TestCase):

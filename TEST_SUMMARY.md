@@ -101,8 +101,8 @@ def test_run_with_comprehensive_data(self, mock_find_account, mock_get_creds):
 | Operation | Basic Tests | Enhanced Tests | Status |
 |-----------|-------------|----------------|---------|
 | EC2 Instances | ✅ | ✅ (4/4 passing) | **Complete** |
-| VPCs | ✅ | ⚠️ (needs function signature fixes) | In Progress |
-| Lambda Functions | ✅ | ⚠️ (needs function name fixes) | In Progress |
+| VPCs | ✅ | ✅ (3/3 passing) | **Complete** |
+| Lambda Functions | ✅ | ✅ (2/2 passing) | **Complete** |
 | CloudFormation | ✅ | ❌ (not implemented) | Pending |
 | RDS | ✅ | ❌ (not implemented) | Pending |
 | ELBs | ✅ | ❌ (not implemented) | Pending |
