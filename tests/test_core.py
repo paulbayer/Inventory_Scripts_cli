@@ -203,7 +203,7 @@ class TestAccountClass(unittest.TestCase):
         
         # Test initialization
         try:
-            account = accnt_class.aws_acct_access(fProfile='test-profile', fRegion='us-east-1')
+            account = account_class.aws_acct_access(fProfile='test-profile', fRegion='us-east-1')
             # If we get here without exception, the basic structure is working
             self.assertTrue(True)
         except Exception as e:

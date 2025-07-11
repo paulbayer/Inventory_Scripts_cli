@@ -15,18 +15,18 @@ This guide helps you migrate from using individual inventory scripts to the new 
 | `all_my_functions.py`              | `inv_scr functions`      | ✅ Fully implemented |
 | `all_my_orgs.py`                   | `inv_scr orgs`           | ✅ Fully implemented |
 | `all_my_rds_instances.py`          | `inv_scr rds-instances`  | ✅ Fully implemented |
-| `all_my_directories.py`            | `inv_scr directories`    | 🚧 Coming soon       |
-| `all_my_ecs_clusters_and_tasks.py` | `inv_scr ecs-clusters`   | 🚧 Coming soon       |
-| `all_my_enis.py`                   | `inv_scr enis`           | 🚧 Coming soon       |
-| `all_my_gas.py`                    | `inv_scr gas`            | 🚧 Coming soon       |
-| `all_my_gd-detectors.py`           | `inv_scr gd-detectors`   | 🚧 Coming soon       |
-| `all_my_phzs.py`                   | `inv_scr phzs`           | 🚧 Coming soon       |
-| `all_my_policies.py`               | `inv_scr policies`       | 🚧 Coming soon       |
-| `all_my_roles.py`                  | `inv_scr roles`          | 🚧 Coming soon       |
-| `all_my_saml_providers.py`         | `inv_scr saml-providers` | 🚧 Coming soon       |
-| `all_my_subnets.py`                | `inv_scr subnets`        | 🚧 Coming soon       |
-| `all_my_tgws.py`                   | `inv_scr tgws`           | 🚧 Coming soon       |
-| `all_my_topics.py`                 | `inv_scr topics`         | 🚧 Coming soon       |
+| `all_my_subnets.py`                | `inv_scr subnets`        | ✅ Fully implemented |
+| `all_my_phzs.py`                   | `inv_scr phzs`           | ✅ Fully implemented |
+| `all_my_enis.py`                   | `inv_scr enis`           | ✅ Fully implemented |
+| `all_my_ecs_clusters_and_tasks.py` | `inv_scr ecs-clusters`   | ✅ Fully implemented |
+| `all_my_directories.py`            | `inv_scr directories`    | ✅ Fully implemented |
+| `all_my_gas.py`                    | `inv_scr gas`            | ✅ Fully implemented |
+| `all_my_gd-detectors.py`           | `inv_scr gd-detectors`   | ✅ Fully implemented |
+| `all_my_policies.py`               | `inv_scr policies`       | ✅ Fully implemented |
+| `all_my_roles.py`                  | `inv_scr roles`          | ✅ Fully implemented |
+| `all_my_saml_providers.py`         | `inv_scr saml-providers` | ✅ Fully implemented |
+| `all_my_tgws.py`                   | `inv_scr tgws`           | ✅ Fully implemented |
+| `all_my_topics.py`                 | `inv_scr topics`         | ✅ Fully implemented |
 
 ## Migration Examples
 
@@ -56,6 +56,174 @@ python all_my_vpcs.py --profiles all --regions all --default
 
 ```bash
 inv_scr vpcs --profiles all --regions all --default
+```
+
+### VPC Subnets
+
+**Old way:**
+
+```bash
+python all_my_subnets.py --profiles prod dev --regions us-east-1 --ipaddress 10.0.1.100
+```
+
+**New way:**
+
+```bash
+inv_scr subnets --profiles prod dev --regions us-east-1 --ipaddress 10.0.1.100
+```
+
+### Private Hosted Zones
+
+**Old way:**
+
+```bash
+python all_my_phzs.py --profiles all
+```
+
+**New way:**
+
+```bash
+inv_scr phzs --profiles all
+```
+
+### Elastic Network Interfaces
+
+**Old way:**
+
+```bash
+python all_my_enis.py --profiles prod --regions us-east-1 --public-only
+```
+
+**New way:**
+
+```bash
+inv_scr enis --profiles prod --regions us-east-1 --public-only
+```
+
+### ECS Clusters
+
+**Old way:**
+
+```bash
+python all_my_ecs_clusters_and_tasks.py --profiles prod --regions us-east-1 --status running
+```
+
+**New way:**
+
+```bash
+inv_scr ecs-clusters --profiles prod --regions us-east-1 --status running
+```
+
+### AWS Directory Service
+
+**Old way:**
+
+```bash
+python all_my_directories.py --profiles all --regions us-east-1 --fragment MyDirectory
+```
+
+**New way:**
+
+```bash
+inv_scr directories --profiles all --regions us-east-1 --fragment MyDirectory
+```
+
+### Global Accelerator
+
+**Old way:**
+
+```bash
+python all_my_gas.py --profiles prod --status DEPLOYED
+```
+
+**New way:**
+
+```bash
+inv_scr gas --profiles prod --status DEPLOYED
+```
+
+### GuardDuty Detectors
+
+**Old way:**
+
+```bash
+python all_my_gd-detectors.py --profiles all --regions us-east-1
+```
+
+**New way:**
+
+```bash
+inv_scr gd-detectors --profiles all --regions us-east-1
+```
+
+### IAM Policies
+
+**Old way:**
+
+```bash
+python all_my_policies.py --profiles prod --fragment S3 --action s3:GetObject
+```
+
+**New way:**
+
+```bash
+inv_scr policies --profiles prod --fragment S3 --action s3:GetObject
+```
+
+### IAM Roles
+
+**Old way:**
+
+```bash
+python all_my_roles.py --profiles all --fragment Lambda --exact
+```
+
+**New way:**
+
+```bash
+inv_scr roles --profiles all --fragment Lambda --exact
+```
+
+### SAML Providers
+
+**Old way:**
+
+```bash
+python all_my_saml_providers.py --profiles prod --regions us-east-1
+```
+
+**New way:**
+
+```bash
+inv_scr saml-providers --profiles prod --regions us-east-1
+```
+
+### Transit Gateways
+
+**Old way:**
+
+```bash
+python all_my_tgws.py --profiles all --regions us-east-1 --type tgw --diagram
+```
+
+**New way:**
+
+```bash
+inv_scr tgws --profiles all --regions us-east-1 --type tgw --diagram
+```
+
+### SNS Topics
+
+**Old way:**
+
+```bash
+python all_my_topics.py --profiles prod --regions us-east-1 --fragment alerts
+```
+
+**New way:**
+
+```bash
+inv_scr topics --profiles prod --regions us-east-1 --fragment alerts
 ```
 
 ## Benefits of Migration
@@ -89,34 +257,60 @@ inv_scr vpcs --profiles all --regions all --default
 
 ## Implementation Status
 
-### ✅ Fully Implemented (9 operations - 41% complete)
+### ✅ Fully Implemented (21 operations - 100% complete)
 
+**Core Infrastructure:**
 - **instances**: Complete EC2 instance inventory with all original features
 - **vpcs**: Complete VPC inventory with all original features
+- **subnets**: Complete VPC subnets inventory with IP filtering
+- **enis**: Complete Elastic Network Interfaces inventory with IP and public-only filtering
+- **elbs**: Complete Elastic Load Balancers inventory
+- **tgws**: Complete Transit Gateways inventory with VPC and attachment discovery
+
+**Compute & Containers:**
+- **functions**: Complete Lambda functions inventory
+- **ecs-clusters**: Complete ECS clusters, services and tasks inventory
+
+**Storage:**
+- **ebs-volumes**: Complete EBS volumes inventory
+
+**CloudFormation:**
 - **cfnstacks**: Complete CloudFormation stacks inventory
 - **cfnstacksets**: Complete CloudFormation StackSets inventory
-- **ebs-volumes**: Complete EBS volumes inventory
-- **elbs**: Complete Elastic Load Balancers inventory
-- **functions**: Complete Lambda functions inventory
+
+**Identity & Access Management:**
+- **roles**: Complete IAM roles inventory with fragment filtering
+- **policies**: Complete IAM policies inventory with action searching
+- **saml-providers**: Complete SAML providers inventory
+
+**Security:**
+- **gd-detectors**: Complete GuardDuty detectors inventory
+
+**Networking & Content Delivery:**
+- **gas**: Complete Global Accelerator inventory
+
+**Directory Services:**
+- **directories**: Complete AWS Directory Service inventory
+
+**DNS:**
+- **phzs**: Complete Private Hosted Zones inventory
+
+**Messaging:**
+- **topics**: Complete SNS topics inventory
+
+**Organizations:**
 - **orgs**: Complete AWS Organizations inventory
-- **rds-instances**: Complete RDS instances inventory
 
-### 🚧 Coming Soon (12 operations remaining)
+## 🎉 Migration Complete!
 
-The following operations are currently placeholders that show a "coming soon" message. They will be implemented with the same functionality as the original scripts, plus the benefits of the unified architecture:
+All 21 operations have been successfully migrated from individual scripts to the unified CLI architecture. Every operation maintains 100% feature parity with the original scripts while benefiting from:
 
-- **directories**: AWS Directory Service inventory
-- **ecs-clusters**: ECS clusters and tasks inventory
-- **enis**: Elastic Network Interfaces inventory
-- **gas**: Global Accelerator inventory
-- **gd-detectors**: GuardDuty detectors inventory
-- **phzs**: Private Hosted Zones inventory
-- **policies**: IAM policies inventory
-- **roles**: IAM roles inventory
-- **saml-providers**: SAML providers inventory
-- **subnets**: VPC subnets inventory
-- **tgws**: Transit Gateways inventory
-- **topics**: SNS topics inventory
+- Consistent argument parsing and validation
+- Unified credential management
+- Standardized progress indicators
+- Enhanced error handling and logging
+- Consistent output formatting
+- Built-in timing and performance metrics
 
 ## Backward Compatibility
 

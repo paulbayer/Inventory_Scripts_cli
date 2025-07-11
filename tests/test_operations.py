@@ -11,7 +11,7 @@ import io
 # Add the parent directory to the path so we can import our modules
 sys.path.insert(0, '..')
 
-from inv_scr.operations import instances, vpcs, cfnstacks, cfnstacksets, ebs_volumes, elbs, functions, orgs, rds_instances
+from inv_scr.operations import instances, vpcs, cfnstacks, cfnstacksets, ebs_volumes, elbs, functions, orgs, rds_instances, subnets, phzs, enis, ecs_clusters, directories, gas, gd_detectors, policies, roles, saml_providers, tgws, topics
 
 
 class TestInstancesOperation(unittest.TestCase):
@@ -805,3 +805,907 @@ class TestPlaceholderOperations(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestSubnetsOperation(unittest.TestCase):
+    """Test cases for the VPC subnets operation"""
+
+    def setUp(self):
+        """Set up test fixtures"""
+        self.mock_args = MagicMock()
+        self.mock_args.Profiles = ['test-profile']
+        self.mock_args.Regions = ['us-east-1']
+        self.mock_args.Accounts = None
+        self.mock_args.SkipAccounts = None
+        self.mock_args.SkipProfiles = None
+        self.mock_args.AccessRoles = None
+        self.mock_args.RootOnly = False
+        self.mock_args.Filename = None
+        self.mock_args.Time = False
+        self.mock_args.pipaddresses = None
+
+    def test_add_operation_args_function_exists(self):
+        """Test that add_operation_args function exists"""
+        self.assertTrue(hasattr(subnets, 'add_operation_args'))
+        self.assertTrue(callable(subnets.add_operation_args))
+
+    def test_run_function_exists(self):
+        """Test that run function exists"""
+        self.assertTrue(hasattr(subnets, 'run'))
+        self.assertTrue(callable(subnets.run))
+
+    def test_find_all_subnets_function_exists(self):
+        """Test that find_all_subnets function exists"""
+        self.assertTrue(hasattr(subnets, 'find_all_subnets'))
+        self.assertTrue(callable(subnets.find_all_subnets))
+
+    @patch('inv_scr.operations.subnets.get_all_credentials')
+    @patch('inv_scr.operations.subnets.find_all_subnets')
+    @patch('inv_scr.operations.subnets.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_basic_execution(self, mock_stdout, mock_display, mock_find, mock_creds):
+        """Test basic execution of subnets run function"""
+        # Mock credentials
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-east-1', 'MgmtAccount': '123456789012'}
+        ]
+        
+        # Mock subnets found
+        mock_find.return_value = [
+            {
+                'MgmtAccount': '123456789012',
+                'AccountId': '123456789012',
+                'Region': 'us-east-1',
+                'SubnetId': 'subnet-12345678',
+                'SubnetName': 'test-subnet',
+                'CidrBlock': '10.0.1.0/24',
+                'VPCId': 'vpc-12345678',
+                'AvailableIpAddressCount': 250,
+                'ParentProfile': 'test-profile'
+            }
+        ]
+        
+        subnets.run(self.mock_args)
+        
+        # Verify that the functions were called
+        mock_creds.assert_called_once()
+        mock_find.assert_called_once()
+        mock_display.assert_called_once()
+        
+        # Check output contains expected text
+        output = mock_stdout.getvalue()
+        self.assertIn("Searching for VPC subnets", output)
+
+    def test_find_all_subnets_empty_credentials(self):
+        """Test find_all_subnets with empty credentials list"""
+        result = subnets.find_all_subnets([])
+        self.assertEqual(result, [])
+
+
+class TestPhzsOperation(unittest.TestCase):
+    """Test cases for the Private Hosted Zones operation"""
+
+    def setUp(self):
+        """Set up test fixtures"""
+        self.mock_args = MagicMock()
+        self.mock_args.Profiles = ['test-profile']
+        self.mock_args.Accounts = None
+        self.mock_args.SkipAccounts = None
+        self.mock_args.SkipProfiles = None
+        self.mock_args.RootOnly = False
+        self.mock_args.Filename = None
+        self.mock_args.Time = False
+
+    def test_add_operation_args_function_exists(self):
+        """Test that add_operation_args function exists"""
+        self.assertTrue(hasattr(phzs, 'add_operation_args'))
+        self.assertTrue(callable(phzs.add_operation_args))
+
+    def test_run_function_exists(self):
+        """Test that run function exists"""
+        self.assertTrue(hasattr(phzs, 'run'))
+        self.assertTrue(callable(phzs.run))
+
+    def test_find_all_hosted_zones_function_exists(self):
+        """Test that find_all_hosted_zones function exists"""
+        self.assertTrue(hasattr(phzs, 'find_all_hosted_zones'))
+        self.assertTrue(callable(phzs.find_all_hosted_zones))
+
+    @patch('inv_scr.operations.phzs.get_all_credentials')
+    @patch('inv_scr.operations.phzs.find_all_hosted_zones')
+    @patch('inv_scr.operations.phzs.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_basic_execution(self, mock_stdout, mock_display, mock_find, mock_creds):
+        """Test basic execution of phzs run function"""
+        # Mock credentials
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-east-1', 'MgmtAccount': '123456789012'}
+        ]
+        
+        # Mock hosted zones found
+        mock_find.return_value = [
+            {
+                'MgmtAccount': '123456789012',
+                'AccountId': '123456789012',
+                'Region': 'Global',
+                'PHZName': 'example.internal.',
+                'Records': 5,
+                'PHZId': '/hostedzone/Z123456789',
+                'ParentProfile': 'test-profile'
+            }
+        ]
+        
+        phzs.run(self.mock_args)
+        
+        # Verify that the functions were called
+        mock_creds.assert_called_once()
+        mock_find.assert_called_once()
+        mock_display.assert_called_once()
+        
+        # Check output contains expected text
+        output = mock_stdout.getvalue()
+        self.assertIn("Searching for Private Hosted Zones", output)
+
+    def test_find_all_hosted_zones_empty_credentials(self):
+        """Test find_all_hosted_zones with empty credentials list"""
+        result = phzs.find_all_hosted_zones([])
+        self.assertEqual(result, [])
+
+
+class TestEnisOperation(unittest.TestCase):
+    """Test cases for the Elastic Network Interfaces operation"""
+
+    def setUp(self):
+        """Set up test fixtures"""
+        self.mock_args = MagicMock()
+        self.mock_args.Profiles = ['test-profile']
+        self.mock_args.Regions = ['us-east-1']
+        self.mock_args.Accounts = None
+        self.mock_args.SkipAccounts = None
+        self.mock_args.SkipProfiles = None
+        self.mock_args.AccessRoles = None
+        self.mock_args.RootOnly = False
+        self.mock_args.Filename = None
+        self.mock_args.Time = False
+        self.mock_args.pipaddresses = None
+        self.mock_args.ppublic = False
+
+    def test_add_operation_args_function_exists(self):
+        """Test that add_operation_args function exists"""
+        self.assertTrue(hasattr(enis, 'add_operation_args'))
+        self.assertTrue(callable(enis.add_operation_args))
+
+    def test_run_function_exists(self):
+        """Test that run function exists"""
+        self.assertTrue(hasattr(enis, 'run'))
+        self.assertTrue(callable(enis.run))
+
+    def test_find_all_enis_function_exists(self):
+        """Test that find_all_enis function exists"""
+        self.assertTrue(hasattr(enis, 'find_all_enis'))
+        self.assertTrue(callable(enis.find_all_enis))
+
+    @patch('inv_scr.operations.enis.get_all_credentials')
+    @patch('inv_scr.operations.enis.find_all_enis')
+    @patch('inv_scr.operations.enis.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_basic_execution(self, mock_stdout, mock_display, mock_find, mock_creds):
+        """Test basic execution of enis run function"""
+        # Mock credentials
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-east-1', 'MgmtAccount': '123456789012'}
+        ]
+        
+        # Mock ENIs found
+        mock_find.return_value = [
+            {
+                'MgmtAccount': '123456789012',
+                'AccountId': '123456789012',
+                'Region': 'us-east-1',
+                'ENIId': 'eni-12345678',
+                'PrivateDnsName': 'ip-10-0-1-100.ec2.internal',
+                'Status': 'in-use',
+                'PublicIp': '54.123.45.67',
+                'PrivateIpAddress': '10.0.1.100',
+                'ParentProfile': 'test-profile'
+            }
+        ]
+        
+        enis.run(self.mock_args)
+        
+        # Verify that the functions were called
+        mock_creds.assert_called_once()
+        mock_find.assert_called_once()
+        mock_display.assert_called_once()
+        
+        # Check output contains expected text
+        output = mock_stdout.getvalue()
+        self.assertIn("Searching for Elastic Network Interfaces", output)
+
+    def test_find_all_enis_empty_credentials(self):
+        """Test find_all_enis with empty credentials list"""
+        result = enis.find_all_enis([])
+        self.assertEqual(result, [])
+
+
+class TestEcsClustersOperation(unittest.TestCase):
+    """Test cases for the ECS Clusters operation"""
+
+    def setUp(self):
+        """Set up test fixtures"""
+        self.mock_args = MagicMock()
+        self.mock_args.Profiles = ['test-profile']
+        self.mock_args.Regions = ['us-east-1']
+        self.mock_args.Accounts = None
+        self.mock_args.SkipAccounts = None
+        self.mock_args.SkipProfiles = None
+        self.mock_args.AccessRoles = None
+        self.mock_args.RootOnly = False
+        self.mock_args.Filename = None
+        self.mock_args.Time = False
+        self.mock_args.pStatus = None
+
+    def test_add_operation_args_function_exists(self):
+        """Test that add_operation_args function exists"""
+        self.assertTrue(hasattr(ecs_clusters, 'add_operation_args'))
+        self.assertTrue(callable(ecs_clusters.add_operation_args))
+
+    def test_run_function_exists(self):
+        """Test that run function exists"""
+        self.assertTrue(hasattr(ecs_clusters, 'run'))
+        self.assertTrue(callable(ecs_clusters.run))
+
+    def test_find_all_clusters_and_tasks_function_exists(self):
+        """Test that find_all_clusters_and_tasks function exists"""
+        self.assertTrue(hasattr(ecs_clusters, 'find_all_clusters_and_tasks'))
+        self.assertTrue(callable(ecs_clusters.find_all_clusters_and_tasks))
+
+    @patch('inv_scr.operations.ecs_clusters.get_all_credentials')
+    @patch('inv_scr.operations.ecs_clusters.find_all_clusters_and_tasks')
+    @patch('inv_scr.operations.ecs_clusters.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_basic_execution(self, mock_stdout, mock_display, mock_find, mock_creds):
+        """Test basic execution of ecs_clusters run function"""
+        # Mock credentials
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-east-1', 'MgmtAccount': '123456789012'}
+        ]
+        
+        # Mock ECS clusters found
+        mock_find.return_value = [
+            {
+                'MgmtAccount': '123456789012',
+                'AccountId': '123456789012',
+                'Region': 'us-east-1',
+                'ClusterName': 'test-cluster',
+                'Status': 'Active',
+                'TaskCount': 5,
+                'ServiceCount': 2,
+                'ParentProfile': 'test-profile'
+            }
+        ]
+        
+        ecs_clusters.run(self.mock_args)
+        
+        # Verify that the functions were called
+        mock_creds.assert_called_once()
+        mock_find.assert_called_once()
+        mock_display.assert_called_once()
+        
+        # Check output contains expected text
+        output = mock_stdout.getvalue()
+        self.assertIn("Searching for ECS clusters", output)
+
+    def test_find_all_clusters_and_tasks_empty_credentials(self):
+        """Test find_all_clusters_and_tasks with empty credentials list"""
+        result = ecs_clusters.find_all_clusters_and_tasks([])
+        self.assertEqual(result, [])
+
+
+# if __name__ == '__main__':
+#     unittest.main()
+
+class TestDirectoriesOperation(unittest.TestCase):
+    """Test cases for the AWS Directory Service operation"""
+
+    def setUp(self):
+        """Set up test fixtures"""
+        self.mock_args = MagicMock()
+        self.mock_args.Profiles = ['test-profile']
+        self.mock_args.Regions = ['us-east-1']
+        self.mock_args.Accounts = None
+        self.mock_args.SkipAccounts = None
+        self.mock_args.SkipProfiles = None
+        self.mock_args.AccessRoles = None
+        self.mock_args.RootOnly = False
+        self.mock_args.Filename = None
+        self.mock_args.Time = False
+        self.mock_args.pFragments = ['all']
+        self.mock_args.pExact = False
+
+    def test_add_operation_args_function_exists(self):
+        """Test that add_operation_args function exists"""
+        self.assertTrue(hasattr(directories, 'add_operation_args'))
+        self.assertTrue(callable(directories.add_operation_args))
+
+    def test_run_function_exists(self):
+        """Test that run function exists"""
+        self.assertTrue(hasattr(directories, 'run'))
+        self.assertTrue(callable(directories.run))
+
+    def test_find_all_directories_function_exists(self):
+        """Test that find_all_directories function exists"""
+        self.assertTrue(hasattr(directories, 'find_all_directories'))
+        self.assertTrue(callable(directories.find_all_directories))
+
+    @patch('inv_scr.operations.directories.get_all_credentials')
+    @patch('inv_scr.operations.directories.find_all_directories')
+    @patch('inv_scr.operations.directories.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_basic_execution(self, mock_stdout, mock_display, mock_find, mock_creds):
+        """Test basic execution of directories run function"""
+        # Mock credentials
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-east-1', 'MgmtAccount': '123456789012'}
+        ]
+        
+        # Mock directories found
+        mock_find.return_value = [
+            {
+                'MgmtAccount': '123456789012',
+                'AccountId': '123456789012',
+                'Region': 'us-east-1',
+                'DirectoryName': 'test-directory',
+                'DirectoryId': 'd-12345678',
+                'Status': 'Active',
+                'Type': 'MicrosoftAD',
+                'ParentProfile': 'test-profile'
+            }
+        ]
+        
+        directories.run(self.mock_args)
+        
+        # Verify that the functions were called
+        mock_creds.assert_called_once()
+        mock_find.assert_called_once()
+        mock_display.assert_called_once()
+        
+        # Check output contains expected text
+        output = mock_stdout.getvalue()
+        self.assertIn("Searching for AWS Directory Service directories", output)
+
+    def test_find_all_directories_empty_credentials(self):
+        """Test find_all_directories with empty credentials list"""
+        result = directories.find_all_directories([])
+        self.assertEqual(result, [])
+
+
+class TestGasOperation(unittest.TestCase):
+    """Test cases for the Global Accelerator operation"""
+
+    def setUp(self):
+        """Set up test fixtures"""
+        self.mock_args = MagicMock()
+        self.mock_args.Profiles = ['test-profile']
+        self.mock_args.Accounts = None
+        self.mock_args.SkipAccounts = None
+        self.mock_args.SkipProfiles = None
+        self.mock_args.AccessRoles = None
+        self.mock_args.RootOnly = False
+        self.mock_args.Filename = None
+        self.mock_args.Time = False
+        self.mock_args.pstatus = 'all'
+
+    def test_add_operation_args_function_exists(self):
+        """Test that add_operation_args function exists"""
+        self.assertTrue(hasattr(gas, 'add_operation_args'))
+        self.assertTrue(callable(gas.add_operation_args))
+
+    def test_run_function_exists(self):
+        """Test that run function exists"""
+        self.assertTrue(hasattr(gas, 'run'))
+        self.assertTrue(callable(gas.run))
+
+    def test_find_all_global_accelerators_function_exists(self):
+        """Test that find_all_global_accelerators function exists"""
+        self.assertTrue(hasattr(gas, 'find_all_global_accelerators'))
+        self.assertTrue(callable(gas.find_all_global_accelerators))
+
+    @patch('inv_scr.operations.gas.get_all_credentials')
+    @patch('inv_scr.operations.gas.find_all_global_accelerators')
+    @patch('inv_scr.operations.gas.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_basic_execution(self, mock_stdout, mock_display, mock_find, mock_creds):
+        """Test basic execution of gas run function"""
+        # Mock credentials
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-west-2', 'MgmtAccount': '123456789012'}
+        ]
+        
+        # Mock global accelerators found
+        mock_find.return_value = [
+            {
+                'MgmtAccount': '123456789012',
+                'AccountId': '123456789012',
+                'Region': 'Global',
+                'Name': 'test-accelerator',
+                'Status': 'DEPLOYED',
+                'DNSName': 'a1234567890abcdef.awsglobalaccelerator.com',
+                'ParentProfile': 'test-profile'
+            }
+        ]
+        
+        gas.run(self.mock_args)
+        
+        # Verify that the functions were called
+        mock_creds.assert_called_once()
+        mock_find.assert_called_once()
+        mock_display.assert_called_once()
+        
+        # Check output contains expected text
+        output = mock_stdout.getvalue()
+        self.assertIn("Searching for Global Accelerators", output)
+
+    def test_find_all_global_accelerators_empty_credentials(self):
+        """Test find_all_global_accelerators with empty credentials list"""
+        result = gas.find_all_global_accelerators([])
+        self.assertEqual(result, [])
+
+
+class TestGdDetectorsOperation(unittest.TestCase):
+    """Test cases for the GuardDuty Detectors operation"""
+
+    def setUp(self):
+        """Set up test fixtures"""
+        self.mock_args = MagicMock()
+        self.mock_args.Profiles = ['test-profile']
+        self.mock_args.Regions = ['us-east-1']
+        self.mock_args.Accounts = None
+        self.mock_args.SkipAccounts = None
+        self.mock_args.SkipProfiles = None
+        self.mock_args.AccessRoles = None
+        self.mock_args.RootOnly = False
+        self.mock_args.Filename = None
+        self.mock_args.Time = False
+
+    def test_add_operation_args_function_exists(self):
+        """Test that add_operation_args function exists"""
+        self.assertTrue(hasattr(gd_detectors, 'add_operation_args'))
+        self.assertTrue(callable(gd_detectors.add_operation_args))
+
+    def test_run_function_exists(self):
+        """Test that run function exists"""
+        self.assertTrue(hasattr(gd_detectors, 'run'))
+        self.assertTrue(callable(gd_detectors.run))
+
+    def test_find_all_gd_detectors_function_exists(self):
+        """Test that find_all_gd_detectors function exists"""
+        self.assertTrue(hasattr(gd_detectors, 'find_all_gd_detectors'))
+        self.assertTrue(callable(gd_detectors.find_all_gd_detectors))
+
+    @patch('inv_scr.operations.gd_detectors.get_all_credentials')
+    @patch('inv_scr.operations.gd_detectors.find_all_gd_detectors')
+    @patch('inv_scr.operations.gd_detectors.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_basic_execution(self, mock_stdout, mock_display, mock_find, mock_creds):
+        """Test basic execution of gd_detectors run function"""
+        # Mock credentials
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-east-1', 'MgmtAccount': '123456789012'}
+        ]
+        
+        # Mock detectors found
+        mock_find.return_value = ([
+            {
+                'MgmtAccount': '123456789012',
+                'AccountId': '123456789012',
+                'Region': 'us-east-1',
+                'DetectorId': '12345678901234567890',
+                'IsAdminAccount': True,
+                'MemberCount': 5,
+                'ParentProfile': 'test-profile'
+            }
+        ], [])  # Empty invitations list
+        
+        gd_detectors.run(self.mock_args)
+        
+        # Verify that the functions were called
+        mock_creds.assert_called_once()
+        mock_find.assert_called_once()
+        mock_display.assert_called_once()
+        
+        # Check output contains expected text
+        output = mock_stdout.getvalue()
+        self.assertIn("Searching for GuardDuty detectors", output)
+
+    def test_find_all_gd_detectors_empty_credentials(self):
+        """Test find_all_gd_detectors with empty credentials list"""
+        detectors, invitations = gd_detectors.find_all_gd_detectors([])
+        self.assertEqual(detectors, [])
+        self.assertEqual(invitations, [])
+
+
+class TestPoliciesOperation(unittest.TestCase):
+    """Test cases for the IAM Policies operation"""
+
+    def setUp(self):
+        """Set up test fixtures"""
+        self.mock_args = MagicMock()
+        self.mock_args.Profiles = ['test-profile']
+        self.mock_args.Accounts = None
+        self.mock_args.SkipAccounts = None
+        self.mock_args.SkipProfiles = None
+        self.mock_args.RootOnly = False
+        self.mock_args.Filename = None
+        self.mock_args.Time = False
+        self.mock_args.pFragments = ['all']
+        self.mock_args.pExact = False
+        self.mock_args.paction = None
+        self.mock_args.pcmp = False
+
+    def test_add_operation_args_function_exists(self):
+        """Test that add_operation_args function exists"""
+        self.assertTrue(hasattr(policies, 'add_operation_args'))
+        self.assertTrue(callable(policies.add_operation_args))
+
+    def test_run_function_exists(self):
+        """Test that run function exists"""
+        self.assertTrue(hasattr(policies, 'run'))
+        self.assertTrue(callable(policies.run))
+
+    def test_find_all_policies_function_exists(self):
+        """Test that find_all_policies function exists"""
+        self.assertTrue(hasattr(policies, 'find_all_policies'))
+        self.assertTrue(callable(policies.find_all_policies))
+
+    @patch('inv_scr.operations.policies.get_all_credentials')
+    @patch('inv_scr.operations.policies.find_all_policies')
+    @patch('inv_scr.operations.policies.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_basic_execution(self, mock_stdout, mock_display, mock_find, mock_creds):
+        """Test basic execution of policies run function"""
+        # Mock credentials
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-east-1', 'MgmtAccount': '123456789012'}
+        ]
+        
+        # Mock policies found
+        mock_find.return_value = [
+            {
+                'MgmtAccount': '123456789012',
+                'AccountNumber': '123456789012',
+                'Region': 'us-east-1',
+                'PolicyName': 'test-policy',
+                'Action': 's3:GetObject',
+                'ParentProfile': 'test-profile'
+            }
+        ]
+        
+        policies.run(self.mock_args)
+        
+        # Verify that the functions were called
+        mock_creds.assert_called_once()
+        mock_find.assert_called_once()
+        mock_display.assert_called_once()
+        
+        # Check output contains expected text
+        output = mock_stdout.getvalue()
+        self.assertIn("Searching for IAM policies", output)
+
+    def test_find_all_policies_empty_credentials(self):
+        """Test find_all_policies with empty credentials list"""
+        result = policies.find_all_policies([])
+        self.assertEqual(result, [])
+
+
+class TestRolesOperation(unittest.TestCase):
+    """Test cases for the IAM Roles operation"""
+
+    def setUp(self):
+        """Set up test fixtures"""
+        self.mock_args = MagicMock()
+        self.mock_args.Profiles = ['test-profile']
+        self.mock_args.Regions = ['us-east-1']
+        self.mock_args.Accounts = None
+        self.mock_args.SkipAccounts = None
+        self.mock_args.SkipProfiles = None
+        self.mock_args.RootOnly = False
+        self.mock_args.Filename = None
+        self.mock_args.Time = False
+        self.mock_args.pFragments = None
+        self.mock_args.pExact = False
+
+    def test_add_operation_args_function_exists(self):
+        """Test that add_operation_args function exists"""
+        self.assertTrue(hasattr(roles, 'add_operation_args'))
+        self.assertTrue(callable(roles.add_operation_args))
+
+    def test_run_function_exists(self):
+        """Test that run function exists"""
+        self.assertTrue(hasattr(roles, 'run'))
+        self.assertTrue(callable(roles.run))
+
+    def test_find_all_roles_function_exists(self):
+        """Test that find_all_roles function exists"""
+        self.assertTrue(hasattr(roles, 'find_all_roles'))
+        self.assertTrue(callable(roles.find_all_roles))
+
+    @patch('inv_scr.operations.roles.get_all_credentials')
+    @patch('inv_scr.operations.roles.find_all_roles')
+    @patch('inv_scr.operations.roles.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_basic_execution(self, mock_stdout, mock_display, mock_find, mock_creds):
+        """Test basic execution of roles run function"""
+        # Mock credentials
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-east-1', 'MgmtAccount': '123456789012'}
+        ]
+        
+        # Mock roles found
+        mock_find.return_value = [
+            {
+                'MgmtAccount': '123456789012',
+                'AccountId': '123456789012',
+                'Region': 'us-east-1',
+                'RoleName': 'test-role',
+                'Path': '/',
+                'CreateDate': '2023-01-01',
+                'ParentProfile': 'test-profile'
+            }
+        ]
+        
+        roles.run(self.mock_args)
+        
+        # Verify that the functions were called
+        mock_creds.assert_called_once()
+        mock_find.assert_called_once()
+        mock_display.assert_called_once()
+        
+        # Check output contains expected text
+        output = mock_stdout.getvalue()
+        self.assertIn("Searching for IAM roles", output)
+
+    def test_find_all_roles_empty_credentials(self):
+        """Test find_all_roles with empty credentials list"""
+        result = roles.find_all_roles([])
+        self.assertEqual(result, [])
+
+
+class TestSamlProvidersOperation(unittest.TestCase):
+    """Test cases for the SAML Providers operation"""
+
+    def setUp(self):
+        """Set up test fixtures"""
+        self.mock_args = MagicMock()
+        self.mock_args.Profiles = ['test-profile']
+        self.mock_args.Regions = ['us-east-1']
+        self.mock_args.Accounts = None
+        self.mock_args.SkipAccounts = None
+        self.mock_args.SkipProfiles = None
+        self.mock_args.AccessRoles = None
+        self.mock_args.RootOnly = False
+        self.mock_args.Filename = None
+        self.mock_args.Time = False
+
+    def test_add_operation_args_function_exists(self):
+        """Test that add_operation_args function exists"""
+        self.assertTrue(hasattr(saml_providers, 'add_operation_args'))
+        self.assertTrue(callable(saml_providers.add_operation_args))
+
+    def test_run_function_exists(self):
+        """Test that run function exists"""
+        self.assertTrue(hasattr(saml_providers, 'run'))
+        self.assertTrue(callable(saml_providers.run))
+
+    def test_find_all_saml_providers_function_exists(self):
+        """Test that find_all_saml_providers function exists"""
+        self.assertTrue(hasattr(saml_providers, 'find_all_saml_providers'))
+        self.assertTrue(callable(saml_providers.find_all_saml_providers))
+
+    @patch('inv_scr.operations.saml_providers.get_all_credentials')
+    @patch('inv_scr.operations.saml_providers.find_all_saml_providers')
+    @patch('inv_scr.operations.saml_providers.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_basic_execution(self, mock_stdout, mock_display, mock_find, mock_creds):
+        """Test basic execution of saml_providers run function"""
+        # Mock credentials
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-east-1', 'MgmtAccount': '123456789012'}
+        ]
+        
+        # Mock SAML providers found
+        mock_find.return_value = [
+            {
+                'MgmtAccount': '123456789012',
+                'AccountNumber': '123456789012',
+                'Region': 'us-east-1',
+                'IdpName': 'test-saml-provider',
+                'Arn': 'arn:aws:iam::123456789012:saml-provider/test-saml-provider',
+                'ParentProfile': 'test-profile'
+            }
+        ]
+        
+        saml_providers.run(self.mock_args)
+        
+        # Verify that the functions were called
+        mock_creds.assert_called_once()
+        mock_find.assert_called_once()
+        mock_display.assert_called_once()
+        
+        # Check output contains expected text
+        output = mock_stdout.getvalue()
+        self.assertIn("Searching for SAML providers", output)
+
+    def test_find_all_saml_providers_empty_credentials(self):
+        """Test find_all_saml_providers with empty credentials list"""
+        result = saml_providers.find_all_saml_providers([])
+        self.assertEqual(result, [])
+
+
+class TestTgwsOperation(unittest.TestCase):
+    """Test cases for the Transit Gateways operation"""
+
+    def setUp(self):
+        """Set up test fixtures"""
+        self.mock_args = MagicMock()
+        self.mock_args.Profiles = ['test-profile']
+        self.mock_args.Regions = ['us-east-1']
+        self.mock_args.Accounts = None
+        self.mock_args.SkipAccounts = None
+        self.mock_args.SkipProfiles = None
+        self.mock_args.AccessRoles = None
+        self.mock_args.RootOnly = False
+        self.mock_args.Filename = None
+        self.mock_args.Time = False
+        self.mock_args.ResourceTypes = ['all']
+        self.mock_args.DrawNetworkDiagram = False
+
+    def test_add_operation_args_function_exists(self):
+        """Test that add_operation_args function exists"""
+        self.assertTrue(hasattr(tgws, 'add_operation_args'))
+        self.assertTrue(callable(tgws.add_operation_args))
+
+    def test_run_function_exists(self):
+        """Test that run function exists"""
+        self.assertTrue(hasattr(tgws, 'run'))
+        self.assertTrue(callable(tgws.run))
+
+    def test_find_all_tgws_function_exists(self):
+        """Test that find_all_tgws function exists"""
+        self.assertTrue(hasattr(tgws, 'find_all_tgws'))
+        self.assertTrue(callable(tgws.find_all_tgws))
+
+    def test_find_all_vpcs_function_exists(self):
+        """Test that find_all_vpcs function exists"""
+        self.assertTrue(hasattr(tgws, 'find_all_vpcs'))
+        self.assertTrue(callable(tgws.find_all_vpcs))
+
+    @patch('inv_scr.operations.tgws.get_all_credentials')
+    @patch('inv_scr.operations.tgws.find_all_tgws')
+    @patch('inv_scr.operations.tgws.find_all_vpcs')
+    @patch('inv_scr.operations.tgws.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_basic_execution(self, mock_stdout, mock_display, mock_find_vpcs, mock_find_tgws, mock_creds):
+        """Test basic execution of tgws run function"""
+        # Mock credentials
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-east-1', 'MgmtAccount': '123456789012'}
+        ]
+        
+        # Mock TGWs and VPCs found
+        mock_find_tgws.return_value = [
+            {
+                'MgmtAccount': '123456789012',
+                'AccountId': '123456789012',
+                'Region': 'us-east-1',
+                'TransitGatewayId': 'tgw-12345678',
+                'TGWName': 'test-tgw',
+                'ParentProfile': 'test-profile'
+            }
+        ]
+        
+        mock_find_vpcs.return_value = [
+            {
+                'MgmtAccount': '123456789012',
+                'AccountId': '123456789012',
+                'Region': 'us-east-1',
+                'VpcId': 'vpc-12345678',
+                'VpcName': 'test-vpc',
+                'ParentProfile': 'test-profile'
+            }
+        ]
+        
+        tgws.run(self.mock_args)
+        
+        # Verify that the functions were called
+        mock_creds.assert_called_once()
+        mock_find_tgws.assert_called_once()
+        mock_find_vpcs.assert_called_once()
+        mock_display.assert_called_once()
+        
+        # Check output contains expected text
+        output = mock_stdout.getvalue()
+        self.assertIn("Searching for Transit Gateways", output)
+
+    def test_find_all_tgws_empty_credentials(self):
+        """Test find_all_tgws with empty credentials list"""
+        result = tgws.find_all_tgws([])
+        self.assertEqual(result, [])
+
+    def test_find_all_vpcs_empty_credentials(self):
+        """Test find_all_vpcs with empty credentials list"""
+        result = tgws.find_all_vpcs([])
+        self.assertEqual(result, [])
+
+
+class TestTopicsOperation(unittest.TestCase):
+    """Test cases for the SNS Topics operation"""
+
+    def setUp(self):
+        """Set up test fixtures"""
+        self.mock_args = MagicMock()
+        self.mock_args.Profiles = ['test-profile']
+        self.mock_args.Regions = ['us-east-1']
+        self.mock_args.Accounts = None
+        self.mock_args.SkipAccounts = None
+        self.mock_args.SkipProfiles = None
+        self.mock_args.AccessRoles = None
+        self.mock_args.RootOnly = False
+        self.mock_args.Filename = None
+        self.mock_args.Time = False
+        self.mock_args.pFragments = None
+        self.mock_args.pExact = False
+
+    def test_add_operation_args_function_exists(self):
+        """Test that add_operation_args function exists"""
+        self.assertTrue(hasattr(topics, 'add_operation_args'))
+        self.assertTrue(callable(topics.add_operation_args))
+
+    def test_run_function_exists(self):
+        """Test that run function exists"""
+        self.assertTrue(hasattr(topics, 'run'))
+        self.assertTrue(callable(topics.run))
+
+    def test_find_all_topics_function_exists(self):
+        """Test that find_all_topics function exists"""
+        self.assertTrue(hasattr(topics, 'find_all_topics'))
+        self.assertTrue(callable(topics.find_all_topics))
+
+    @patch('inv_scr.operations.topics.get_all_credentials')
+    @patch('inv_scr.operations.topics.find_all_topics')
+    @patch('inv_scr.operations.topics.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_basic_execution(self, mock_stdout, mock_display, mock_find, mock_creds):
+        """Test basic execution of topics run function"""
+        # Mock credentials
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-east-1', 'MgmtAccount': '123456789012'}
+        ]
+        
+        # Mock topics found
+        mock_find.return_value = [
+            {
+                'MgmtAccount': '123456789012',
+                'AccountId': '123456789012',
+                'Region': 'us-east-1',
+                'TopicName': 'test-topic',
+                'TopicArn': 'arn:aws:sns:us-east-1:123456789012:test-topic',
+                'ParentProfile': 'test-profile'
+            }
+        ]
+        
+        topics.run(self.mock_args)
+        
+        # Verify that the functions were called
+        mock_creds.assert_called_once()
+        mock_find.assert_called_once()
+        mock_display.assert_called_once()
+        
+        # Check output contains expected text
+        output = mock_stdout.getvalue()
+        self.assertIn("Searching for SNS topics", output)
+
+    def test_find_all_topics_empty_credentials(self):
+        """Test find_all_topics with empty credentials list"""
+        result = topics.find_all_topics([])
+        self.assertEqual(result, [])
