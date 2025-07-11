@@ -37,6 +37,7 @@ help:
 	@echo "  test-enhanced-all        Run all credential-level tests"
 	@echo "  test-enhanced-quick      Quick enhanced tests (EC2 only)"
 	@echo "  test-enhanced-demo       Demonstrate mock fixtures"
+	@echo "  test-shared-data-demo    Demonstrate shared test data system"
 	@echo ""
 	@echo "📊 Coverage & Analysis:"
 	@echo "  coverage             Traditional coverage report"
@@ -175,6 +176,11 @@ test-enhanced-demo: install
 		print('Complex Org Creds:', len(MockCredentialFixtures.complex_org_structure())); \
 		print('EC2 Response Sample:', len(MockAWSResponseFixtures.ec2_instances_response()['Reservations'])); \
 		print('✅ Mock fixtures working correctly!')"
+
+# Demonstrate shared test data system
+test-shared-data-demo: install
+	@echo "🏗️  Demonstrating Shared Test Data System..."
+	python3 demo_shared_test_data.py
 
 # Enhanced coverage report including credential-level tests
 coverage-enhanced: install

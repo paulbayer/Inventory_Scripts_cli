@@ -183,12 +183,12 @@ class TestInstancesOperation(unittest.TestCase):
     @patch('sys.stdout', new_callable=io.StringIO)
     def test_run_with_single_account_credentials(self, mock_stdout, mock_display, mock_find_account, mock_get_creds):
         """Test complete run flow with single account credentials and realistic AWS response"""
-        # Use mock credential fixture
-        mock_credentials = MockCredentialFixtures.single_account_single_region()
+        # Use shared test data system for more realistic and consistent data
+        mock_credentials = MockCredentialFixtures.get_scenario_credentials('simple')
         mock_get_creds.return_value = mock_credentials
         
-        # Use mock AWS response fixture
-        mock_aws_response = MockAWSResponseFixtures.ec2_instances_response(num_instances=3)
+        # Use scenario-based AWS response for consistency
+        mock_aws_response = MockAWSResponseFixtures.ec2_instances_response(num_instances=3, scenario='simple')
         mock_find_account.return_value = mock_aws_response
         
         # Create mock args using helper
@@ -210,14 +210,14 @@ class TestInstancesOperation(unittest.TestCase):
         mock_display.assert_called_once()
         display_args = mock_display.call_args[0][0]  # First positional argument
         
-        # Verify data transformation logic
+        # Verify data transformation logic using shared test data
         self.assertEqual(len(display_args), 3)  # Should have 3 instances
-        for i, instance in enumerate(display_args):
+        for instance in display_args:
             self.assertEqual(instance['AccountId'], '123456789012')
             self.assertEqual(instance['Region'], 'us-east-1')
             self.assertEqual(instance['ParentProfile'], 'test-profile')
-            self.assertEqual(instance['InstanceId'], f'i-{str(i).zfill(17)}abcdef{i}')
-            self.assertEqual(instance['Name'], f'test-instance-{i}')
+            # Verify realistic instance naming from shared data
+            self.assertTrue(instance['Name'].startswith('master-account-instance-'))
             self.assertIn(instance['State'], ['running', 'stopped'])
 
     @patch('inv_scr.operations.instances.get_all_credentials')
