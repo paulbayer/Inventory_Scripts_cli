@@ -12,6 +12,7 @@ import io
 sys.path.insert(0, '..')
 
 from inv_scr.operations import instances, vpcs, cfnstacks, cfnstacksets, ebs_volumes, elbs, functions, orgs, rds_instances, subnets, phzs, enis, ecs_clusters, directories, gas, gd_detectors, policies, roles, saml_providers, tgws, topics
+from tests.mock_fixtures import MockCredentialFixtures, MockAWSResponseFixtures, MockOperationHelpers
 
 
 class TestInstancesOperation(unittest.TestCase):
@@ -175,6 +176,212 @@ class TestInstancesOperation(unittest.TestCase):
         self.assertEqual(result[0]['InstanceId'], 'i-running')
         self.assertEqual(result[0]['State'], 'running')
 
+    # Enhanced credential-level mocking tests
+    @patch('inv_scr.operations.instances.get_all_credentials')
+    @patch('inv_scr.operations.instances.Inventory_Modules.find_account_instances2')
+    @patch('inv_scr.operations.instances.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_single_account_credentials(self, mock_stdout, mock_display, mock_find_account, mock_get_creds):
+        """Test complete run flow with single account credentials and realistic AWS response"""
+        # Use mock credential fixture
+        mock_credentials = MockCredentialFixtures.single_account_single_region()
+        mock_get_creds.return_value = mock_credentials
+        
+        # Use mock AWS response fixture
+        mock_aws_response = MockAWSResponseFixtures.ec2_instances_response(num_instances=3)
+        mock_find_account.return_value = mock_aws_response
+        
+        # Create mock args using helper
+        mock_args = MockOperationHelpers.create_mock_args(pStatus=None)
+        
+        with patch('inv_scr.operations.instances.tqdm') as mock_tqdm:
+            mock_pbar = MagicMock()
+            mock_tqdm.return_value = mock_pbar
+            
+            instances.run(mock_args)
+        
+        # Verify credential handling
+        mock_get_creds.assert_called_once()
+        
+        # Verify AWS API was called with correct credentials
+        mock_find_account.assert_called_once_with(mock_credentials[0])
+        
+        # Verify display was called with processed results
+        mock_display.assert_called_once()
+        display_args = mock_display.call_args[0][0]  # First positional argument
+        
+        # Verify data transformation logic
+        self.assertEqual(len(display_args), 3)  # Should have 3 instances
+        for i, instance in enumerate(display_args):
+            self.assertEqual(instance['AccountId'], '123456789012')
+            self.assertEqual(instance['Region'], 'us-east-1')
+            self.assertEqual(instance['ParentProfile'], 'test-profile')
+            self.assertEqual(instance['InstanceId'], f'i-{str(i).zfill(17)}abcdef{i}')
+            self.assertEqual(instance['Name'], f'test-instance-{i}')
+            self.assertIn(instance['State'], ['running', 'stopped'])
+
+    @patch('inv_scr.operations.instances.get_all_credentials')
+    @patch('inv_scr.operations.instances.Inventory_Modules.find_account_instances2')
+    @patch('inv_scr.operations.instances.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_multi_account_credentials(self, mock_stdout, mock_display, mock_find_account, mock_get_creds):
+        """Test complete run flow with multiple account credentials"""
+        # Use multi-account credential fixture
+        mock_credentials = MockCredentialFixtures.multi_account_single_region()
+        mock_get_creds.return_value = mock_credentials
+        
+        # Mock different responses for different accounts
+        def side_effect(credential):
+            account_id = credential['AccountId']
+            if account_id == '123456789012':
+                return MockAWSResponseFixtures.ec2_instances_response(num_instances=2)
+            elif account_id == '234567890123':
+                return MockAWSResponseFixtures.ec2_instances_response(num_instances=1)
+            else:
+                return {'Reservations': []}  # Empty response for third account
+        
+        mock_find_account.side_effect = side_effect
+        
+        mock_args = MockOperationHelpers.create_mock_args()
+        
+        with patch('inv_scr.operations.instances.tqdm') as mock_tqdm:
+            mock_pbar = MagicMock()
+            mock_tqdm.return_value = mock_pbar
+            
+            instances.run(mock_args)
+        
+        # Verify credentials were processed
+        mock_get_creds.assert_called_once()
+        
+        # Verify AWS API was called for each account
+        self.assertEqual(mock_find_account.call_count, 3)
+        
+        # Verify display was called
+        mock_display.assert_called_once()
+        display_args = mock_display.call_args[0][0]
+        
+        # Should have instances from first two accounts (2 + 1 = 3 total)
+        self.assertEqual(len(display_args), 3)
+        
+        # Verify account distribution
+        account_counts = {}
+        for instance in display_args:
+            account_id = instance['AccountId']
+            account_counts[account_id] = account_counts.get(account_id, 0) + 1
+        
+        self.assertEqual(account_counts.get('123456789012', 0), 2)
+        self.assertEqual(account_counts.get('234567890123', 0), 1)
+        self.assertEqual(account_counts.get('345678901234', 0), 0)
+
+    @patch('inv_scr.operations.instances.get_all_credentials')
+    @patch('inv_scr.operations.instances.Inventory_Modules.find_account_instances2')
+    @patch('inv_scr.operations.instances.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_status_filtering_logic(self, mock_stdout, mock_display, mock_find_account, mock_get_creds):
+        """Test that status filtering logic works correctly with realistic data"""
+        mock_credentials = MockCredentialFixtures.single_account_single_region()
+        mock_get_creds.return_value = mock_credentials
+        
+        # Create response with mixed instance states
+        mock_aws_response = {
+            'Reservations': [
+                {
+                    'Instances': [
+                        {
+                            'InstanceId': 'i-running1',
+                            'InstanceType': 't3.micro',
+                            'State': {'Name': 'running'},
+                            'PublicDnsName': 'ec2-running1.compute-1.amazonaws.com',
+                            'Tags': [{'Key': 'Name', 'Value': 'running-instance-1'}]
+                        },
+                        {
+                            'InstanceId': 'i-stopped1',
+                            'InstanceType': 't3.small',
+                            'State': {'Name': 'stopped'},
+                            'PublicDnsName': '',
+                            'Tags': [{'Key': 'Name', 'Value': 'stopped-instance-1'}]
+                        },
+                        {
+                            'InstanceId': 'i-running2',
+                            'InstanceType': 't3.medium',
+                            'State': {'Name': 'running'},
+                            'PublicDnsName': 'ec2-running2.compute-1.amazonaws.com',
+                            'Tags': [{'Key': 'Name', 'Value': 'running-instance-2'}]
+                        }
+                    ]
+                }
+            ]
+        }
+        mock_find_account.return_value = mock_aws_response
+        
+        # Test filtering for running instances only
+        mock_args = MockOperationHelpers.create_mock_args(pStatus='running')
+        
+        with patch('inv_scr.operations.instances.tqdm') as mock_tqdm:
+            mock_pbar = MagicMock()
+            mock_tqdm.return_value = mock_pbar
+            
+            instances.run(mock_args)
+        
+        # Verify display was called
+        mock_display.assert_called_once()
+        display_args = mock_display.call_args[0][0]
+        
+        # Should only have running instances (2 out of 3)
+        self.assertEqual(len(display_args), 2)
+        for instance in display_args:
+            self.assertEqual(instance['State'], 'running')
+            self.assertIn(instance['InstanceId'], ['i-running1', 'i-running2'])
+
+    @patch('inv_scr.operations.instances.get_all_credentials')
+    @patch('inv_scr.operations.instances.Inventory_Modules.find_account_instances2')
+    @patch('inv_scr.operations.instances.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_multi_region_credentials(self, mock_stdout, mock_display, mock_find_account, mock_get_creds):
+        """Test complete run flow with multi-region credentials"""
+        mock_credentials = MockCredentialFixtures.single_account_multi_region()
+        mock_get_creds.return_value = mock_credentials
+        
+        # Mock different responses for different regions
+        def side_effect(credential):
+            region = credential['Region']
+            if region == 'us-east-1':
+                return MockAWSResponseFixtures.ec2_instances_response(num_instances=2)
+            elif region == 'us-west-2':
+                return MockAWSResponseFixtures.ec2_instances_response(num_instances=1)
+            else:  # eu-west-1
+                return {'Reservations': []}  # Empty response
+        
+        mock_find_account.side_effect = side_effect
+        
+        mock_args = MockOperationHelpers.create_mock_args()
+        
+        with patch('inv_scr.operations.instances.tqdm') as mock_tqdm:
+            mock_pbar = MagicMock()
+            mock_tqdm.return_value = mock_pbar
+            
+            instances.run(mock_args)
+        
+        # Verify AWS API was called for each region
+        self.assertEqual(mock_find_account.call_count, 3)
+        
+        # Verify display was called
+        mock_display.assert_called_once()
+        display_args = mock_display.call_args[0][0]
+        
+        # Should have instances from first two regions (2 + 1 = 3 total)
+        self.assertEqual(len(display_args), 3)
+        
+        # Verify region distribution
+        region_counts = {}
+        for instance in display_args:
+            region = instance['Region']
+            region_counts[region] = region_counts.get(region, 0) + 1
+        
+        self.assertEqual(region_counts.get('us-east-1', 0), 2)
+        self.assertEqual(region_counts.get('us-west-2', 0), 1)
+        self.assertEqual(region_counts.get('eu-west-1', 0), 0)
+
 
 class TestVPCsOperation(unittest.TestCase):
     """Test cases for the VPCs operation"""
@@ -271,6 +478,138 @@ class TestVPCsOperation(unittest.TestCase):
         self.assertEqual(result[0]['VpcName'], 'test-vpc')
         self.assertEqual(result[0]['CIDR'], '10.0.0.0/16')
         self.assertFalse(result[0]['IsDefault'])
+
+    # Enhanced credential-level mocking tests for VPCs
+    @patch('inv_scr.operations.vpcs.get_all_credentials')
+    @patch('inv_scr.operations.vpcs.Inventory_Modules.find_account_vpcs2')
+    @patch('inv_scr.operations.vpcs.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_comprehensive_vpc_data(self, mock_stdout, mock_display, mock_find_account, mock_get_creds):
+        """Test complete VPC run flow with comprehensive credential and response mocking"""
+        # Use mock credential fixture
+        mock_credentials = MockCredentialFixtures.single_account_single_region()
+        mock_get_creds.return_value = mock_credentials
+        
+        # Use mock AWS response fixture
+        mock_aws_response = MockAWSResponseFixtures.vpc_response(num_vpcs=2)
+        mock_find_account.return_value = mock_aws_response
+        
+        # Create mock args using helper
+        mock_args = MockOperationHelpers.create_mock_args(pDefault=False)
+        
+        vpcs.run(mock_args)
+        
+        # Verify credential handling
+        mock_get_creds.assert_called_once()
+        
+        # Verify AWS API was called with correct credentials and default flag
+        mock_find_account.assert_called_once_with(mock_credentials[0], False)
+        
+        # Verify display was called with processed results
+        mock_display.assert_called_once()
+        display_args = mock_display.call_args[0][0]
+        
+        # Verify data transformation logic
+        self.assertEqual(len(display_args), 2)  # Should have 2 VPCs
+        for i, vpc in enumerate(display_args):
+            self.assertEqual(vpc['AccountId'], '123456789012')
+            self.assertEqual(vpc['Region'], 'us-east-1')
+            self.assertEqual(vpc['VpcId'], f'vpc-{str(i).zfill(8)}abcdef{i}')
+            self.assertEqual(vpc['VpcName'], f'test-vpc-{i}')
+            self.assertEqual(vpc['CIDR'], f'10.{i}.0.0/16')
+            self.assertEqual(vpc['IsDefault'], i == 0)  # First VPC is default
+
+    @patch('inv_scr.operations.vpcs.get_all_credentials')
+    @patch('inv_scr.operations.vpcs.Inventory_Modules.find_account_vpcs2')
+    @patch('inv_scr.operations.vpcs.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_default_vpc_filtering(self, mock_stdout, mock_display, mock_find_account, mock_get_creds):
+        """Test VPC filtering logic for default VPCs"""
+        mock_credentials = MockCredentialFixtures.single_account_single_region()
+        mock_get_creds.return_value = mock_credentials
+        
+        # Create response with mix of default and non-default VPCs
+        mock_aws_response = {
+            'Vpcs': [
+                {
+                    'VpcId': 'vpc-default123',
+                    'IsDefault': True,
+                    'CidrBlockAssociationSet': [{'CidrBlock': '172.31.0.0/16'}],
+                    'Tags': [{'Key': 'Name', 'Value': 'default-vpc'}]
+                },
+                {
+                    'VpcId': 'vpc-custom456',
+                    'IsDefault': False,
+                    'CidrBlockAssociationSet': [{'CidrBlock': '10.0.0.0/16'}],
+                    'Tags': [{'Key': 'Name', 'Value': 'custom-vpc'}]
+                }
+            ]
+        }
+        mock_find_account.return_value = mock_aws_response
+        
+        # Test filtering for default VPCs only
+        mock_args = MockOperationHelpers.create_mock_args(pDefault=True)
+        
+        vpcs.run(mock_args)
+        
+        # Verify AWS API was called with correct credentials and default flag
+        mock_find_account.assert_called_once_with(mock_credentials[0], True)
+        
+        # Verify display was called
+        mock_display.assert_called_once()
+        display_args = mock_display.call_args[0][0]
+        
+        # Should have both VPCs since filtering happens in AWS API, not in our logic
+        self.assertEqual(len(display_args), 2)
+        # Verify that the data transformation worked correctly
+        for vpc in display_args:
+            self.assertIn(vpc['VpcId'], ['vpc-default123', 'vpc-custom456'])
+            self.assertIn(vpc['VpcName'], ['default-vpc', 'custom-vpc'])
+
+    @patch('inv_scr.operations.vpcs.get_all_credentials')
+    @patch('inv_scr.operations.vpcs.Inventory_Modules.find_account_vpcs2')
+    @patch('inv_scr.operations.vpcs.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_multi_account_vpc_data(self, mock_stdout, mock_display, mock_find_account, mock_get_creds):
+        """Test VPC operation across multiple accounts"""
+        mock_credentials = MockCredentialFixtures.multi_account_single_region()
+        mock_get_creds.return_value = mock_credentials
+        
+        # Mock different VPC responses for different accounts
+        def side_effect(credential):
+            account_id = credential['AccountId']
+            if account_id == '123456789012':
+                return MockAWSResponseFixtures.vpc_response(num_vpcs=2)
+            elif account_id == '234567890123':
+                return MockAWSResponseFixtures.vpc_response(num_vpcs=1)
+            else:
+                return {'Vpcs': []}  # Empty response for third account
+        
+        mock_find_account.side_effect = side_effect
+        
+        mock_args = MockOperationHelpers.create_mock_args()
+        
+        vpcs.run(mock_args)
+        
+        # Verify AWS API was called for each account
+        self.assertEqual(mock_find_account.call_count, 3)
+        
+        # Verify display was called
+        mock_display.assert_called_once()
+        display_args = mock_display.call_args[0][0]
+        
+        # Should have VPCs from first two accounts (2 + 1 = 3 total)
+        self.assertEqual(len(display_args), 3)
+        
+        # Verify account distribution
+        account_counts = {}
+        for vpc in display_args:
+            account_id = vpc['AccountId']
+            account_counts[account_id] = account_counts.get(account_id, 0) + 1
+        
+        self.assertEqual(account_counts.get('123456789012', 0), 2)
+        self.assertEqual(account_counts.get('234567890123', 0), 1)
+        self.assertEqual(account_counts.get('345678901234', 0), 0)
 
 
 class TestCfnStacksOperation(unittest.TestCase):
@@ -627,6 +966,114 @@ class TestFunctionsOperation(unittest.TestCase):
         # Check output contains expected text
         output = mock_stdout.getvalue()
         self.assertIn("Searching for Lambda functions", output)
+
+    # Enhanced credential-level mocking tests for Lambda functions
+    @patch('inv_scr.operations.functions.get_all_credentials')
+    @patch('inv_scr.operations.functions.Inventory_Modules.find_lambda_functions2')
+    @patch('inv_scr.operations.functions.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_comprehensive_lambda_data(self, mock_stdout, mock_display, mock_find_account, mock_get_creds):
+        """Test complete Lambda functions run flow with comprehensive credential and response mocking"""
+        # Use mock credential fixture
+        mock_credentials = MockCredentialFixtures.single_account_single_region()
+        mock_get_creds.return_value = mock_credentials
+        
+        # Use mock AWS response fixture
+        mock_aws_response = MockAWSResponseFixtures.lambda_functions_response(num_functions=3)
+        mock_find_account.return_value = mock_aws_response
+        
+        # Create mock args using helper
+        mock_args = MockOperationHelpers.create_mock_args(pRuntime=None)
+        
+        with patch('inv_scr.operations.functions.tqdm') as mock_tqdm:
+            mock_pbar = MagicMock()
+            mock_tqdm.return_value = mock_pbar
+            
+            functions.run(mock_args)
+        
+        # Verify credential handling
+        mock_get_creds.assert_called_once()
+        
+        # Verify AWS API was called with correct credentials
+        mock_find_account.assert_called_once_with(mock_credentials[0])
+        
+        # Verify display was called with processed results
+        mock_display.assert_called_once()
+        display_args = mock_display.call_args[0][0]
+        
+        # Verify data transformation logic
+        self.assertEqual(len(display_args), 3)  # Should have 3 functions
+        for i, function in enumerate(display_args):
+            self.assertEqual(function['AccountId'], '123456789012')
+            self.assertEqual(function['Region'], 'us-east-1')
+            self.assertEqual(function['FunctionName'], f'test-function-{i}')
+            self.assertIn(function['Runtime'], ['python3.9', 'nodejs18.x'])
+            self.assertEqual(function['ParentProfile'], 'test-profile')
+
+    @patch('inv_scr.operations.functions.get_all_credentials')
+    @patch('inv_scr.operations.functions.Inventory_Modules.find_lambda_functions2')
+    @patch('inv_scr.operations.functions.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_runtime_filtering_logic(self, mock_stdout, mock_display, mock_find_account, mock_get_creds):
+        """Test Lambda function runtime filtering logic"""
+        mock_credentials = MockCredentialFixtures.single_account_single_region()
+        mock_get_creds.return_value = mock_credentials
+        
+        # Create response with mixed runtimes
+        mock_aws_response = {
+            'Functions': [
+                {
+                    'FunctionName': 'python-function-1',
+                    'Runtime': 'python3.9',
+                    'Role': 'arn:aws:iam::123456789012:role/python-role',
+                    'Handler': 'lambda_function.lambda_handler',
+                    'CodeSize': 1024,
+                    'Description': 'Python function 1',
+                    'Timeout': 30,
+                    'MemorySize': 128
+                },
+                {
+                    'FunctionName': 'node-function-1',
+                    'Runtime': 'nodejs18.x',
+                    'Role': 'arn:aws:iam::123456789012:role/node-role',
+                    'Handler': 'index.handler',
+                    'CodeSize': 2048,
+                    'Description': 'Node.js function 1',
+                    'Timeout': 60,
+                    'MemorySize': 256
+                },
+                {
+                    'FunctionName': 'python-function-2',
+                    'Runtime': 'python3.11',
+                    'Role': 'arn:aws:iam::123456789012:role/python-role',
+                    'Handler': 'lambda_function.lambda_handler',
+                    'CodeSize': 1536,
+                    'Description': 'Python function 2',
+                    'Timeout': 45,
+                    'MemorySize': 512
+                }
+            ]
+        }
+        mock_find_account.return_value = mock_aws_response
+        
+        # Test filtering for Python runtime only
+        mock_args = MockOperationHelpers.create_mock_args(pRuntime='python')
+        
+        with patch('inv_scr.operations.functions.tqdm') as mock_tqdm:
+            mock_pbar = MagicMock()
+            mock_tqdm.return_value = mock_pbar
+            
+            functions.run(mock_args)
+        
+        # Verify display was called
+        mock_display.assert_called_once()
+        display_args = mock_display.call_args[0][0]
+        
+        # Should only have Python functions (2 out of 3)
+        self.assertEqual(len(display_args), 2)
+        for function in display_args:
+            self.assertIn('python', function['Runtime'].lower())
+            self.assertIn(function['FunctionName'], ['python-function-1', 'python-function-2'])
 
 
 class TestOrgsOperation(unittest.TestCase):
