@@ -1,4 +1,4 @@
-inv_scr/core/__pycache__/*
-inv_scr/functions/__pycache__/*
-inv_scr/operations/__pycache__/*
-__pycache__/*
+# Python cache directories
+__pycache__/
+*.py[cod]
+*$py.class
