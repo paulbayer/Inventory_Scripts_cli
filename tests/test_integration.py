@@ -162,11 +162,14 @@ class TestPackageStructure(unittest.TestCase):
             'MIGRATION.md'
         ]
         
+        # Get the project root directory (parent of tests directory)
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
         for file_path in required_files:
-            full_path = os.path.join('..', file_path)
+            full_path = os.path.join(project_root, file_path)
             self.assertTrue(
                 os.path.exists(full_path),
-                f"Required file {file_path} does not exist"
+                f"Required file {file_path} does not exist at {full_path}"
             )
 
     def test_operation_files_exist(self):
@@ -178,11 +181,14 @@ class TestPackageStructure(unittest.TestCase):
             'roles', 'saml_providers', 'subnets', 'tgws', 'topics'
         ]
         
+        # Get the project root directory (parent of tests directory)
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
         for operation in operations:
-            file_path = f'../inv_scr/operations/{operation}.py'
+            file_path = os.path.join(project_root, 'inv_scr', 'operations', f'{operation}.py')
             self.assertTrue(
                 os.path.exists(file_path),
-                f"Operation file {operation}.py does not exist"
+                f"Operation file {operation}.py does not exist at {file_path}"
             )
 
     def test_core_files_exist(self):
@@ -193,11 +199,14 @@ class TestPackageStructure(unittest.TestCase):
             'Inventory_Modules.py'
         ]
         
+        # Get the project root directory (parent of tests directory)
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
         for core_file in core_files:
-            file_path = f'../inv_scr/core/{core_file}'
+            file_path = os.path.join(project_root, 'inv_scr', 'core', core_file)
             self.assertTrue(
                 os.path.exists(file_path),
-                f"Core file {core_file} does not exist"
+                f"Core file {core_file} does not exist at {file_path}"
             )
 
 

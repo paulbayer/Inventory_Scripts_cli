@@ -12,6 +12,7 @@ inv_scr.egg-info/requires.txt
 inv_scr.egg-info/top_level.txt
 inv_scr/core/ArgumentsClass.py
 inv_scr/core/Inventory_Modules.py
+inv_scr/core/__init__.py
 inv_scr/core/account_class.py
 inv_scr/core/decorators.py
 inv_scr/core/exceptions.py

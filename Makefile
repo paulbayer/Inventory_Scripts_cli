@@ -1,25 +1,28 @@
-.PHONY: all venv run clean
+.PHONY: all install uninstall run clean test unittest coverage validate
+
+# Virtual environment directory
+VENV = venv
 
 # default target, when make executed without arguments
 all: install
 
-$(VENV)/bin/activate: setup.py
-	pyenv virtualenv 3.8.5 cli_setup
-	pyenv activate cli_setup
-	pip install --upgrade pip
+$(VENV)/bin/activate: setup.py requirements.txt
+	python3 -m venv $(VENV)
+	./$(VENV)/bin/pip install --upgrade pip
+	./$(VENV)/bin/pip install -r requirements.txt
+	./$(VENV)/bin/pip install -e .
 
 install:
 	pip3 install -e .
 
 uninstall:
-	pip3 uninstall cli_setup -y
+	pip3 uninstall inv_scr -y
 
 # venv is a shortcut target
 venv: $(VENV)/bin/activate
 
-run: venv
-	#./$(VENV)/bin/python3 app.py
-	cli_skeleton
+run: install
+	inv_scr list
 
 test: install
 	inv_scr list

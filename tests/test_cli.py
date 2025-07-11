@@ -127,8 +127,8 @@ class TestCLI(unittest.TestCase):
         self.assertIn("Available inventory operations:", output)
 
     @patch('inv_scr.cli.parse_args')
-    @patch('inv_scr.operations.instances.run')
-    def test_main_instances_operation(self, mock_instances_run, mock_parse_args):
+    @patch('inv_scr.cli.OPERATIONS')
+    def test_main_instances_operation(self, mock_operations, mock_parse_args):
         """Test main function with instances operation"""
         # Mock the arguments
         mock_args = MagicMock()
@@ -137,6 +137,10 @@ class TestCLI(unittest.TestCase):
         mock_args.Time = False
         mock_parse_args.return_value = mock_args
         
+        # Mock the operations dictionary
+        mock_instances_run = MagicMock()
+        mock_operations.__getitem__.return_value = mock_instances_run
+        
         with patch('sys.stdout', new_callable=io.StringIO):
             main()
         
@@ -144,8 +148,8 @@ class TestCLI(unittest.TestCase):
         mock_instances_run.assert_called_once_with(mock_args)
 
     @patch('inv_scr.cli.parse_args')
-    @patch('inv_scr.operations.vpcs.run')
-    def test_main_vpcs_operation(self, mock_vpcs_run, mock_parse_args):
+    @patch('inv_scr.cli.OPERATIONS')
+    def test_main_vpcs_operation(self, mock_operations, mock_parse_args):
         """Test main function with VPCs operation"""
         # Mock the arguments
         mock_args = MagicMock()
@@ -154,6 +158,10 @@ class TestCLI(unittest.TestCase):
         mock_args.Time = False
         mock_parse_args.return_value = mock_args
         
+        # Mock the operations dictionary
+        mock_vpcs_run = MagicMock()
+        mock_operations.__getitem__.return_value = mock_vpcs_run
+        
         with patch('sys.stdout', new_callable=io.StringIO):
             main()
         
@@ -161,8 +169,8 @@ class TestCLI(unittest.TestCase):
         mock_vpcs_run.assert_called_once_with(mock_args)
 
     @patch('inv_scr.cli.parse_args')
-    @patch('inv_scr.operations.instances.run')
-    def test_main_with_timing(self, mock_instances_run, mock_parse_args):
+    @patch('inv_scr.cli.OPERATIONS')
+    def test_main_with_timing(self, mock_operations, mock_parse_args):
         """Test main function with timing enabled"""
         # Mock the arguments
         mock_args = MagicMock()
@@ -171,6 +179,10 @@ class TestCLI(unittest.TestCase):
         mock_args.Time = True
         mock_parse_args.return_value = mock_args
         
+        # Mock the operations dictionary
+        mock_instances_run = MagicMock()
+        mock_operations.__getitem__.return_value = mock_instances_run
+        
         with patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
             main()
         
@@ -178,8 +190,8 @@ class TestCLI(unittest.TestCase):
         self.assertIn("operation_complete:", output)
 
     @patch('inv_scr.cli.parse_args')
-    @patch('inv_scr.operations.instances.run')
-    def test_main_keyboard_interrupt(self, mock_instances_run, mock_parse_args):
+    @patch('inv_scr.cli.OPERATIONS')
+    def test_main_keyboard_interrupt(self, mock_operations, mock_parse_args):
         """Test main function handles KeyboardInterrupt"""
         # Mock the arguments
         mock_args = MagicMock()
@@ -187,8 +199,10 @@ class TestCLI(unittest.TestCase):
         mock_args.loglevel = 50  # CRITICAL
         mock_parse_args.return_value = mock_args
         
-        # Make the operation raise KeyboardInterrupt
+        # Mock the operations dictionary and make it raise KeyboardInterrupt
+        mock_instances_run = MagicMock()
         mock_instances_run.side_effect = KeyboardInterrupt()
+        mock_operations.__getitem__.return_value = mock_instances_run
         
         with patch('sys.stdout', new_callable=io.StringIO):
             with self.assertRaises(SystemExit) as cm:
@@ -197,8 +211,8 @@ class TestCLI(unittest.TestCase):
             self.assertEqual(cm.exception.code, 1)
 
     @patch('inv_scr.cli.parse_args')
-    @patch('inv_scr.operations.instances.run')
-    def test_main_exception_handling(self, mock_instances_run, mock_parse_args):
+    @patch('inv_scr.cli.OPERATIONS')
+    def test_main_exception_handling(self, mock_operations, mock_parse_args):
         """Test main function handles general exceptions"""
         # Mock the arguments
         mock_args = MagicMock()
@@ -206,8 +220,10 @@ class TestCLI(unittest.TestCase):
         mock_args.loglevel = 50  # CRITICAL
         mock_parse_args.return_value = mock_args
         
-        # Make the operation raise a general exception
+        # Mock the operations dictionary and make it raise a general exception
+        mock_instances_run = MagicMock()
         mock_instances_run.side_effect = Exception("Test error")
+        mock_operations.__getitem__.return_value = mock_instances_run
         
         with patch('sys.stdout', new_callable=io.StringIO):
             with self.assertRaises(SystemExit) as cm:
