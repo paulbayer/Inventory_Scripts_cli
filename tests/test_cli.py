@@ -175,7 +175,7 @@ class TestCLI(unittest.TestCase):
             main()
         
         output = mock_stdout.getvalue()
-        self.assertIn("Total execution time:", output)
+        self.assertIn("operation_complete:", output)
 
     @patch('inv_scr.cli.parse_args')
     @patch('inv_scr.operations.instances.run')

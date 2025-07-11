@@ -15,6 +15,7 @@ inv_scr/core/Inventory_Modules.py
 inv_scr/core/account_class.py
 inv_scr/core/decorators.py
 inv_scr/core/exceptions.py
+inv_scr/core/timing.py
 inv_scr/core/vpc_modules.py
 inv_scr/operations/__init__.py
 inv_scr/operations/cfnstacks.py
@@ -38,3 +39,9 @@ inv_scr/operations/subnets.py
 inv_scr/operations/tgws.py
 inv_scr/operations/topics.py
 inv_scr/operations/vpcs.py
+tests/test_argument_parsing.py
+tests/test_cli.py
+tests/test_core.py
+tests/test_integration.py
+tests/test_operations.py
+tests/test_runner.py
