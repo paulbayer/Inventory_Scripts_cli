@@ -34,6 +34,9 @@ help:
 	@echo "  test-enhanced-instances  Run enhanced EC2 instances tests (✅ Working)"
 	@echo "  test-enhanced-vpcs       Run enhanced VPC tests (✅ Working)"
 	@echo "  test-enhanced-lambda     Run enhanced Lambda tests (✅ Working)"
+	@echo "  test-enhanced-cfnstacks  Run enhanced CloudFormation tests (🆕 New)"
+	@echo "  test-enhanced-rds        Run enhanced RDS instances tests (🆕 New)"
+	@echo "  test-enhanced-elbs       Run enhanced ELB tests (🆕 New)"
 	@echo "  test-enhanced-all        Run all credential-level tests"
 	@echo "  test-enhanced-quick      Quick enhanced tests (EC2 only)"
 	@echo "  test-enhanced-demo       Demonstrate mock fixtures"
@@ -152,6 +155,35 @@ test-enhanced-lambda: install
 	python3 -m unittest \
 		tests.test_operations.TestFunctionsOperation.test_run_with_comprehensive_lambda_data \
 		tests.test_operations.TestFunctionsOperation.test_run_with_runtime_filtering_logic \
+		-v
+
+# NEW: Enhanced tests for top priority operations
+test-enhanced-cfnstacks: install
+	@echo "🔍 Running Enhanced CloudFormation Stacks Tests..."
+	python3 -m unittest \
+		tests.test_operations.TestCfnStacksOperation.test_run_with_single_account_credentials \
+		tests.test_operations.TestCfnStacksOperation.test_run_with_multi_account_credentials \
+		tests.test_operations.TestCfnStacksOperation.test_run_with_status_filtering_logic \
+		tests.test_operations.TestCfnStacksOperation.test_run_with_fragment_filtering_logic \
+		tests.test_operations.TestCfnStacksOperation.test_run_with_stack_id_flag \
+		-v
+
+test-enhanced-rds: install
+	@echo "🔍 Running Enhanced RDS Instances Tests..."
+	python3 -m unittest \
+		tests.test_operations.TestRdsInstancesOperation.test_run_with_single_account_credentials \
+		tests.test_operations.TestRdsInstancesOperation.test_run_with_multi_account_credentials \
+		tests.test_operations.TestRdsInstancesOperation.test_run_with_fragment_filtering_logic \
+		tests.test_operations.TestRdsInstancesOperation.test_run_with_uniquification_logic \
+		-v
+
+test-enhanced-elbs: install
+	@echo "🔍 Running Enhanced ELB Tests..."
+	python3 -m unittest \
+		tests.test_operations.TestElbsOperation.test_run_with_single_account_credentials \
+		tests.test_operations.TestElbsOperation.test_run_with_multi_account_credentials \
+		tests.test_operations.TestElbsOperation.test_run_with_status_filtering_logic \
+		tests.test_operations.TestElbsOperation.test_run_with_fragment_filtering_logic \
 		-v
 
 # Run all enhanced credential-level tests

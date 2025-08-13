@@ -237,6 +237,86 @@ class SharedAWSResponseData:
                 }
             }
         }
+    
+    @staticmethod
+    def get_base_cfn_stack(stack_name: str, account: TestAccount, region: TestRegion, **kwargs) -> Dict[str, Any]:
+        """Get base CloudFormation stack data"""
+        defaults = {
+            'StackStatus': 'CREATE_COMPLETE',
+            'CreationTime': datetime(2023, 1, 1, 12, 0, 0),
+            'Description': f'CloudFormation stack for {account.name}',
+            'EnableTerminationProtection': False,
+            'DriftInformation': {'StackDriftStatus': 'NOT_CHECKED'}
+        }
+        defaults.update(kwargs)
+        
+        return {
+            'StackName': stack_name,
+            'StackId': f'arn:aws:cloudformation:{region.code}:{account.account_id}:stack/{stack_name}/12345678-1234-1234-1234-123456789012',
+            **defaults,
+            'Tags': [
+                {'Key': 'Environment', 'Value': account.name.split('-')[0]},
+                {'Key': 'Account', 'Value': account.name},
+                {'Key': 'ManagedBy', 'Value': 'CloudFormation'}
+            ]
+        }
+    
+    @staticmethod
+    def get_base_rds_instance(db_id: str, account: TestAccount, region: TestRegion, **kwargs) -> Dict[str, Any]:
+        """Get base RDS instance data"""
+        defaults = {
+            'DBInstanceClass': 'db.t3.micro',
+            'Engine': 'mysql',
+            'DBInstanceStatus': 'available',
+            'MasterUsername': 'admin',
+            'AllocatedStorage': 20,
+            'StorageType': 'gp2',
+            'StorageEncrypted': True,
+            'MultiAZ': False,
+            'PubliclyAccessible': False
+        }
+        defaults.update(kwargs)
+        
+        return {
+            'DBInstanceIdentifier': db_id,
+            'DBName': f'{account.name.replace("-", "")}_db_{db_id[-1]}',
+            'LatestRestorableTime': datetime(2023, 1, 2, 12, 0, 0),
+            **defaults,
+            'VpcSecurityGroups': [
+                {
+                    'VpcSecurityGroupId': f'sg-{account.account_id[-8:]}example',
+                    'Status': 'active'
+                }
+            ],
+            'DBSubnetGroup': {
+                'DBSubnetGroupName': f'{account.name}-subnet-group',
+                'VpcId': f'vpc-{account.account_id[-8:]}example'
+            }
+        }
+    
+    @staticmethod
+    def get_base_elb(elb_name: str, account: TestAccount, region: TestRegion, **kwargs) -> Dict[str, Any]:
+        """Get base ELB data"""
+        defaults = {
+            'State': {'Code': 'active'},
+            'Type': 'application',
+            'Scheme': 'internet-facing',
+            'IpAddressType': 'ipv4'
+        }
+        defaults.update(kwargs)
+        
+        return {
+            'LoadBalancerName': elb_name,
+            'DNSName': f'{elb_name}-{account.account_id[-4:]}.{region.code}.elb.amazonaws.com',
+            'LoadBalancerArn': f'arn:aws:elasticloadbalancing:{region.code}:{account.account_id}:loadbalancer/app/{elb_name}/1234567890123456',
+            **defaults,
+            'AvailabilityZones': [
+                {'ZoneName': f'{region.code}a'},
+                {'ZoneName': f'{region.code}b'}
+            ],
+            'SecurityGroups': [f'sg-{account.account_id[-8:]}example'],
+            'VpcId': f'vpc-{account.account_id[-8:]}example'
+        }
 
 
 class TestScenarios:
@@ -300,6 +380,99 @@ class TestScenarios:
 
 class ResponseBuilder:
     """Builder for creating AWS API responses using shared data"""
+    
+    @staticmethod
+    def build_cfn_stacks_response(scenario_name: str, stacks_per_account: int = 2) -> List[Dict[str, Any]]:
+        """Build CloudFormation stacks response for a scenario"""
+        scenario = TestScenarios.get_scenario_by_name(scenario_name)
+        if not scenario:
+            raise ValueError(f"Unknown scenario: {scenario_name}")
+        
+        stacks = []
+        account_counter = 0
+        
+        if 'accounts' in scenario:
+            # Multi-account scenario
+            for account in scenario['accounts']:
+                for i in range(stacks_per_account):
+                    stack_name = f'{account.name}-stack-{i}'
+                    stacks.append(SharedAWSResponseData.get_base_cfn_stack(
+                        stack_name, account, scenario['region']
+                    ))
+                account_counter += 1
+        else:
+            # Single account scenario
+            account = scenario['account']
+            region = scenario.get('region', SharedTestRegions.US_EAST_1)
+            for i in range(stacks_per_account):
+                stack_name = f'{account.name}-stack-{i}'
+                stacks.append(SharedAWSResponseData.get_base_cfn_stack(
+                    stack_name, account, region
+                ))
+        
+        return stacks
+    
+    @staticmethod
+    def build_rds_response(scenario_name: str, instances_per_account: int = 2) -> Dict[str, Any]:
+        """Build RDS instances response for a scenario"""
+        scenario = TestScenarios.get_scenario_by_name(scenario_name)
+        if not scenario:
+            raise ValueError(f"Unknown scenario: {scenario_name}")
+        
+        instances = []
+        account_counter = 0
+        
+        if 'accounts' in scenario:
+            # Multi-account scenario
+            for account in scenario['accounts']:
+                for i in range(instances_per_account):
+                    db_id = f'{account.name.replace("-", "")}-db-{i}'
+                    instances.append(SharedAWSResponseData.get_base_rds_instance(
+                        db_id, account, scenario['region']
+                    ))
+                account_counter += 1
+        else:
+            # Single account scenario
+            account = scenario['account']
+            region = scenario.get('region', SharedTestRegions.US_EAST_1)
+            for i in range(instances_per_account):
+                db_id = f'{account.name.replace("-", "")}-db-{i}'
+                instances.append(SharedAWSResponseData.get_base_rds_instance(
+                    db_id, account, region
+                ))
+        
+        return {'DBInstances': instances}
+    
+    @staticmethod
+    def build_elb_response(scenario_name: str, elbs_per_account: int = 2) -> List[Dict[str, Any]]:
+        """Build ELB response for a scenario"""
+        scenario = TestScenarios.get_scenario_by_name(scenario_name)
+        if not scenario:
+            raise ValueError(f"Unknown scenario: {scenario_name}")
+        
+        elbs = []
+        account_counter = 0
+        
+        if 'accounts' in scenario:
+            # Multi-account scenario
+            for account in scenario['accounts']:
+                for i in range(elbs_per_account):
+                    elb_name = f'{account.name}-elb-{i}'
+                    elbs.append(SharedAWSResponseData.get_base_elb(
+                        elb_name, account, scenario['region']
+                    ))
+                account_counter += 1
+        else:
+            # Single account scenario
+            account = scenario['account']
+            region = scenario.get('region', SharedTestRegions.US_EAST_1)
+            for i in range(elbs_per_account):
+                elb_name = f'{account.name}-elb-{i}'
+                elbs.append(SharedAWSResponseData.get_base_elb(
+                    elb_name, account, region
+                ))
+        
+        return elbs
     
     @staticmethod
     def build_ec2_response(scenario_name: str, instances_per_account: int = 2) -> Dict[str, Any]:

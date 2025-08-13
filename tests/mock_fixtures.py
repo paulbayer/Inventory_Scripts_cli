@@ -8,6 +8,7 @@ backward compatibility with existing tests.
 
 from unittest.mock import MagicMock
 from typing import List, Dict, Any
+from datetime import datetime
 
 # Import shared test data components
 from tests.shared_test_data import (
@@ -165,6 +166,90 @@ class MockAWSResponseFixtures:
             
             return functions
     
+    @staticmethod
+    def cfn_stacks_response(num_stacks: int = 2, scenario: str = 'simple') -> List[Dict[str, Any]]:
+        """Mock CloudFormation stacks response - returns list directly"""
+        # Use shared test data system for more realistic responses
+        try:
+            return ResponseBuilder.build_cfn_stacks_response(scenario, num_stacks)
+        except ValueError:
+            # Fallback to legacy behavior for backward compatibility
+            stacks = []
+            
+            for i in range(num_stacks):
+                stacks.append({
+                    'StackName': f'test-stack-{i}',
+                    'StackId': f'arn:aws:cloudformation:us-east-1:123456789012:stack/test-stack-{i}/12345678-1234-1234-1234-123456789012',
+                    'StackStatus': 'CREATE_COMPLETE' if i % 2 == 0 else 'UPDATE_COMPLETE',
+                    'CreationTime': datetime(2023, 1, 1, 12, 0, 0),
+                    'Description': f'Test CloudFormation stack {i}',
+                    'Tags': [
+                        {'Key': 'Environment', 'Value': 'test'},
+                        {'Key': 'Owner', 'Value': 'test-team'}
+                    ]
+                })
+            
+            return stacks
+    
+    @staticmethod
+    def rds_instances_response(num_instances: int = 2, scenario: str = 'simple') -> Dict[str, Any]:
+        """Mock RDS instances response"""
+        # Use shared test data system for more realistic responses
+        try:
+            return ResponseBuilder.build_rds_response(scenario, num_instances)
+        except ValueError:
+            # Fallback to legacy behavior for backward compatibility
+            instances = []
+            
+            for i in range(num_instances):
+                instances.append({
+                    'DBInstanceIdentifier': f'test-db-{i}',
+                    'DBInstanceClass': 'db.t3.micro',
+                    'Engine': 'mysql' if i % 2 == 0 else 'postgres',
+                    'DBInstanceStatus': 'available',
+                    'MasterUsername': 'admin',
+                    'DBName': f'testdb{i}',
+                    'AllocatedStorage': 20,
+                    'LatestRestorableTime': datetime(2023, 1, 2, 12, 0, 0),
+                    'VpcSecurityGroups': [
+                        {
+                            'VpcSecurityGroupId': f'sg-{str(i).zfill(8)}example',
+                            'Status': 'active'
+                        }
+                    ],
+                    'DBSubnetGroup': {
+                        'DBSubnetGroupName': f'test-subnet-group-{i}',
+                        'VpcId': f'vpc-{str(i).zfill(8)}example'
+                    },
+                    'MultiAZ': False,
+                    'PubliclyAccessible': False,
+                    'StorageType': 'gp2',
+                    'StorageEncrypted': True
+                })
+            
+            return {'DBInstances': instances}
+    
+    @staticmethod
+    def elb_response(num_elbs: int = 2, scenario: str = 'simple') -> List[Dict[str, Any]]:
+        """Mock ELB response - returns list directly"""
+        # Use shared test data system for more realistic responses
+        try:
+            return ResponseBuilder.build_elb_response(scenario, num_elbs)
+        except ValueError:
+            # Fallback to legacy behavior for backward compatibility
+            elbs = []
+            
+            for i in range(num_elbs):
+                elbs.append({
+                    'LoadBalancerName': f'test-elb-{i}',
+                    'DNSName': f'test-elb-{i}-123456789.us-east-1.elb.amazonaws.com',
+                    'State': {'Code': 'active'},
+                    'Type': 'application',
+                    'Scheme': 'internet-facing'
+                })
+            
+            return elbs
+
     # Legacy methods for backward compatibility
     @staticmethod
     def cloudformation_stacks_response(num_stacks: int = 2) -> Dict[str, Any]:

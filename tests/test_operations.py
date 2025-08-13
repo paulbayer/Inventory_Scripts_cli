@@ -688,6 +688,248 @@ class TestCfnStacksOperation(unittest.TestCase):
         result = cfnstacks.find_all_cfnstacks([])
         self.assertEqual(result, [])
 
+    # Enhanced credential-level mocking tests for CloudFormation Stacks
+    @patch('inv_scr.operations.cfnstacks.get_all_credentials')
+    @patch('inv_scr.operations.cfnstacks.Inventory_Modules.find_stacks2')
+    @patch('inv_scr.operations.cfnstacks.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_single_account_credentials(self, mock_stdout, mock_display, mock_find_stacks, mock_get_creds):
+        """Test complete CloudFormation stacks run flow with single account credentials"""
+        # Use shared test data system
+        mock_credentials = MockCredentialFixtures.get_scenario_credentials('simple')
+        mock_get_creds.return_value = mock_credentials
+        
+        # Use scenario-based AWS response
+        mock_stacks_list = MockAWSResponseFixtures.cfn_stacks_response(num_stacks=3, scenario='simple')
+        mock_find_stacks.return_value = mock_stacks_list
+        
+        # Create mock args
+        mock_args = MockOperationHelpers.create_mock_args(
+            pFragments=['all'], pStatus=None, pExact=False, pStackId=False
+        )
+        
+        with patch('inv_scr.operations.cfnstacks.tqdm') as mock_tqdm:
+            mock_pbar = MagicMock()
+            mock_tqdm.return_value = mock_pbar
+            
+            cfnstacks.run(mock_args)
+        
+        # Verify credential handling
+        mock_get_creds.assert_called_once()
+        
+        # Verify AWS API was called with correct parameters
+        mock_find_stacks.assert_called_once_with(
+            mock_credentials[0], mock_credentials[0]['Region'], ['all'], None
+        )
+        
+        # Verify display was called with processed results
+        mock_display.assert_called_once()
+        display_args = mock_display.call_args[0][0]
+        
+        # Verify data transformation logic
+        self.assertEqual(len(display_args), 3)  # Should have 3 stacks
+        for stack in display_args:
+            self.assertEqual(stack['AccountId'], '123456789012')
+            self.assertEqual(stack['Region'], 'us-east-1')
+            self.assertEqual(stack['ParentProfile'], 'test-profile')
+            self.assertTrue(stack['StackName'].startswith('master-account-stack-'))
+            self.assertIn(stack['StackStatus'], ['CREATE_COMPLETE', 'UPDATE_COMPLETE'])
+            self.assertEqual(stack['StackArn'], 'None')  # Default when pStackId=False
+
+    @patch('inv_scr.operations.cfnstacks.get_all_credentials')
+    @patch('inv_scr.operations.cfnstacks.Inventory_Modules.find_stacks2')
+    @patch('inv_scr.operations.cfnstacks.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_multi_account_credentials(self, mock_stdout, mock_display, mock_find_stacks, mock_get_creds):
+        """Test CloudFormation stacks operation across multiple accounts"""
+        mock_credentials = MockCredentialFixtures.get_scenario_credentials('multi_account')
+        mock_get_creds.return_value = mock_credentials
+        
+        # Mock different stack responses for different accounts
+        def side_effect(credential, region, fragments, status):
+            account_id = credential['AccountId']
+            if account_id == '123456789012':  # master-account
+                return MockAWSResponseFixtures.cfn_stacks_response(2, scenario='simple')
+            elif account_id == '234567890123':  # dev-account
+                return MockAWSResponseFixtures.cfn_stacks_response(1, scenario='simple')
+            else:
+                return []  # Empty response for third account
+        
+        mock_find_stacks.side_effect = side_effect
+        
+        mock_args = MockOperationHelpers.create_mock_args(pFragments=['all'])
+        
+        with patch('inv_scr.operations.cfnstacks.tqdm') as mock_tqdm:
+            mock_pbar = MagicMock()
+            mock_tqdm.return_value = mock_pbar
+            
+            cfnstacks.run(mock_args)
+        
+        # Verify AWS API was called for each account
+        self.assertEqual(mock_find_stacks.call_count, 3)
+        
+        # Verify display was called
+        mock_display.assert_called_once()
+        display_args = mock_display.call_args[0][0]
+        
+        # Should have stacks from first two accounts (2 + 1 = 3 total)
+        self.assertEqual(len(display_args), 3)
+        
+        # Verify account distribution
+        account_counts = {}
+        for stack in display_args:
+            account_id = stack['AccountId']
+            account_counts[account_id] = account_counts.get(account_id, 0) + 1
+        
+        self.assertEqual(account_counts.get('123456789012', 0), 2)
+        self.assertEqual(account_counts.get('234567890123', 0), 1)
+        self.assertEqual(account_counts.get('345678901234', 0), 0)
+
+    @patch('inv_scr.operations.cfnstacks.get_all_credentials')
+    @patch('inv_scr.operations.cfnstacks.Inventory_Modules.find_stacks2')
+    @patch('inv_scr.operations.cfnstacks.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_status_filtering_logic(self, mock_stdout, mock_display, mock_find_stacks, mock_get_creds):
+        """Test CloudFormation stack status filtering logic"""
+        mock_credentials = MockCredentialFixtures.get_scenario_credentials('simple')
+        mock_get_creds.return_value = mock_credentials
+        
+        # Create response with mixed stack statuses
+        mixed_stacks = [
+            {
+                'StackName': 'successful-stack',
+                'StackId': 'arn:aws:cloudformation:us-east-1:123456789012:stack/successful-stack/12345678-1234-1234-1234-123456789012',
+                'StackStatus': 'CREATE_COMPLETE',
+                'CreationTime': datetime(2023, 1, 1, 12, 0, 0),
+                'Description': 'Successfully created stack'
+            },
+            {
+                'StackName': 'failed-stack',
+                'StackId': 'arn:aws:cloudformation:us-east-1:123456789012:stack/failed-stack/12345678-1234-1234-1234-123456789012',
+                'StackStatus': 'CREATE_FAILED',
+                'CreationTime': datetime(2023, 1, 1, 12, 0, 0),
+                'Description': 'Failed to create stack'
+            },
+            {
+                'StackName': 'updating-stack',
+                'StackId': 'arn:aws:cloudformation:us-east-1:123456789012:stack/updating-stack/12345678-1234-1234-1234-123456789012',
+                'StackStatus': 'UPDATE_IN_PROGRESS',
+                'CreationTime': datetime(2023, 1, 1, 12, 0, 0),
+                'Description': 'Stack being updated'
+            }
+        ]
+        mock_find_stacks.return_value = mixed_stacks
+        
+        # Test filtering for CREATE_COMPLETE status only
+        mock_args = MockOperationHelpers.create_mock_args(
+            pFragments=['all'], pStatus=['CREATE_COMPLETE']
+        )
+        
+        with patch('inv_scr.operations.cfnstacks.tqdm') as mock_tqdm:
+            mock_pbar = MagicMock()
+            mock_tqdm.return_value = mock_pbar
+            
+            cfnstacks.run(mock_args)
+        
+        # Verify AWS API was called with status filter
+        mock_find_stacks.assert_called_once_with(
+            mock_credentials[0], mock_credentials[0]['Region'], ['all'], ['CREATE_COMPLETE']
+        )
+        
+        # Verify display was called
+        mock_display.assert_called_once()
+        display_args = mock_display.call_args[0][0]
+        
+        # Should have all 3 stacks (filtering happens in AWS API, not in our logic)
+        self.assertEqual(len(display_args), 3)
+        for stack in display_args:
+            self.assertIn(stack['StackStatus'], ['CREATE_COMPLETE', 'CREATE_FAILED', 'UPDATE_IN_PROGRESS'])
+
+    @patch('inv_scr.operations.cfnstacks.get_all_credentials')
+    @patch('inv_scr.operations.cfnstacks.Inventory_Modules.find_stacks2')
+    @patch('inv_scr.operations.cfnstacks.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_fragment_filtering_logic(self, mock_stdout, mock_display, mock_find_stacks, mock_get_creds):
+        """Test CloudFormation stack fragment filtering logic"""
+        mock_credentials = MockCredentialFixtures.get_scenario_credentials('simple')
+        mock_get_creds.return_value = mock_credentials
+        
+        # Create response with stacks that match fragment
+        filtered_stacks = [
+            {
+                'StackName': 'web-app-stack',
+                'StackId': 'arn:aws:cloudformation:us-east-1:123456789012:stack/web-app-stack/12345678-1234-1234-1234-123456789012',
+                'StackStatus': 'CREATE_COMPLETE',
+                'CreationTime': datetime(2023, 1, 1, 12, 0, 0),
+                'Description': 'Web application stack'
+            },
+            {
+                'StackName': 'web-db-stack',
+                'StackId': 'arn:aws:cloudformation:us-east-1:123456789012:stack/web-db-stack/12345678-1234-1234-1234-123456789012',
+                'StackStatus': 'CREATE_COMPLETE',
+                'CreationTime': datetime(2023, 1, 1, 12, 0, 0),
+                'Description': 'Web database stack'
+            }
+        ]
+        mock_find_stacks.return_value = filtered_stacks
+        
+        # Test filtering for 'web' fragment
+        mock_args = MockOperationHelpers.create_mock_args(
+            pFragments=['web'], pExact=False
+        )
+        
+        with patch('inv_scr.operations.cfnstacks.tqdm') as mock_tqdm:
+            mock_pbar = MagicMock()
+            mock_tqdm.return_value = mock_pbar
+            
+            cfnstacks.run(mock_args)
+        
+        # Verify AWS API was called with fragment filter
+        mock_find_stacks.assert_called_once_with(
+            mock_credentials[0], mock_credentials[0]['Region'], ['web'], None
+        )
+        
+        # Verify display was called
+        mock_display.assert_called_once()
+        display_args = mock_display.call_args[0][0]
+        
+        # Should have 2 stacks matching the fragment
+        self.assertEqual(len(display_args), 2)
+        for stack in display_args:
+            self.assertIn('web', stack['StackName'].lower())
+
+    @patch('inv_scr.operations.cfnstacks.get_all_credentials')
+    @patch('inv_scr.operations.cfnstacks.Inventory_Modules.find_stacks2')
+    @patch('inv_scr.operations.cfnstacks.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_stack_id_flag(self, mock_stdout, mock_display, mock_find_stacks, mock_get_creds):
+        """Test CloudFormation stack ID display logic"""
+        mock_credentials = MockCredentialFixtures.get_scenario_credentials('simple')
+        mock_get_creds.return_value = mock_credentials
+        
+        mock_stacks_list = MockAWSResponseFixtures.cfn_stacks_response(num_stacks=2, scenario='simple')
+        mock_find_stacks.return_value = mock_stacks_list
+        
+        # Test with StackId flag enabled
+        mock_args = MockOperationHelpers.create_mock_args(
+            pFragments=['all'], pStackId=True
+        )
+        
+        with patch('inv_scr.operations.cfnstacks.tqdm') as mock_tqdm:
+            mock_pbar = MagicMock()
+            mock_tqdm.return_value = mock_pbar
+            
+            cfnstacks.run(mock_args)
+        
+        # Verify display was called
+        mock_display.assert_called_once()
+        display_args = mock_display.call_args[0][0]
+        
+        # Verify StackArn is populated when pStackId=True
+        for stack in display_args:
+            self.assertNotEqual(stack['StackArn'], 'None')
+            self.assertTrue(stack['StackArn'].startswith('arn:aws:cloudformation:'))
+
 
 class TestCfnStackSetsOperation(unittest.TestCase):
     """Test cases for the CloudFormation StackSets operation"""
@@ -897,6 +1139,200 @@ class TestElbsOperation(unittest.TestCase):
         # Check output contains expected text
         output = mock_stdout.getvalue()
         self.assertIn("Searching for Elastic Load Balancers", output)
+
+    # Enhanced credential-level mocking tests for Elastic Load Balancers
+    @patch('inv_scr.operations.elbs.get_all_credentials')
+    @patch('inv_scr.operations.elbs.Inventory_Modules.find_load_balancers2')
+    @patch('inv_scr.operations.elbs.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_single_account_credentials(self, mock_stdout, mock_display, mock_find_elbs, mock_get_creds):
+        """Test complete ELB run flow with single account credentials"""
+        # Use shared test data system
+        mock_credentials = MockCredentialFixtures.get_scenario_credentials('simple')
+        mock_get_creds.return_value = mock_credentials
+        
+        # Use scenario-based AWS response
+        mock_elbs_list = MockAWSResponseFixtures.elb_response(num_elbs=2, scenario='simple')
+        mock_find_elbs.return_value = mock_elbs_list
+        
+        # Create mock args
+        mock_args = MockOperationHelpers.create_mock_args(
+            pFragments=['all'], pStatus='active', pExact=False
+        )
+        
+        with patch('inv_scr.operations.elbs.tqdm') as mock_tqdm:
+            mock_pbar = MagicMock()
+            mock_tqdm.return_value = mock_pbar
+            
+            elbs.run(mock_args)
+        
+        # Verify credential handling
+        mock_get_creds.assert_called_once()
+        
+        # Verify AWS API was called with correct parameters
+        # Note: find_load_balancers2 is called with (credential, fragments, status) in the queue
+        self.assertEqual(mock_find_elbs.call_count, 1)
+        
+        # Verify display was called with processed results
+        mock_display.assert_called_once()
+        display_args = mock_display.call_args[0][0]
+        
+        # Verify data transformation logic
+        self.assertEqual(len(display_args), 2)  # Should have 2 ELBs
+        for elb in display_args:
+            self.assertEqual(elb['AccountId'], '123456789012')
+            self.assertEqual(elb['Region'], 'us-east-1')
+            self.assertEqual(elb['ParentProfile'], 'test-profile')
+            self.assertTrue(elb['Name'].startswith('master-account-elb-'))
+            self.assertEqual(elb['Status'], 'active')
+            self.assertTrue(elb['DNSName'].endswith('.us-east-1.elb.amazonaws.com'))
+
+    @patch('inv_scr.operations.elbs.get_all_credentials')
+    @patch('inv_scr.operations.elbs.Inventory_Modules.find_load_balancers2')
+    @patch('inv_scr.operations.elbs.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_multi_account_credentials(self, mock_stdout, mock_display, mock_find_elbs, mock_get_creds):
+        """Test ELB operation across multiple accounts"""
+        mock_credentials = MockCredentialFixtures.get_scenario_credentials('multi_account')
+        mock_get_creds.return_value = mock_credentials
+        
+        # Mock different ELB responses for different accounts
+        def side_effect(credential, fragments, status):
+            account_id = credential['AccountId']
+            if account_id == '123456789012':  # master-account
+                return MockAWSResponseFixtures.elb_response(2, scenario='simple')
+            elif account_id == '234567890123':  # dev-account
+                return MockAWSResponseFixtures.elb_response(1, scenario='simple')
+            else:
+                return []  # Empty response for third account
+        
+        mock_find_elbs.side_effect = side_effect
+        
+        mock_args = MockOperationHelpers.create_mock_args(pFragments=['all'], pStatus='active')
+        
+        with patch('inv_scr.operations.elbs.tqdm') as mock_tqdm:
+            mock_pbar = MagicMock()
+            mock_tqdm.return_value = mock_pbar
+            
+            elbs.run(mock_args)
+        
+        # Verify AWS API was called for each account
+        self.assertEqual(mock_find_elbs.call_count, 3)
+        
+        # Verify display was called
+        mock_display.assert_called_once()
+        display_args = mock_display.call_args[0][0]
+        
+        # Should have ELBs from first two accounts (2 + 1 = 3 total)
+        self.assertEqual(len(display_args), 3)
+        
+        # Verify account distribution
+        account_counts = {}
+        for elb in display_args:
+            account_id = elb['AccountId']
+            account_counts[account_id] = account_counts.get(account_id, 0) + 1
+        
+        self.assertEqual(account_counts.get('123456789012', 0), 2)
+        self.assertEqual(account_counts.get('234567890123', 0), 1)
+        self.assertEqual(account_counts.get('345678901234', 0), 0)
+
+    @patch('inv_scr.operations.elbs.get_all_credentials')
+    @patch('inv_scr.operations.elbs.Inventory_Modules.find_load_balancers2')
+    @patch('inv_scr.operations.elbs.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_status_filtering_logic(self, mock_stdout, mock_display, mock_find_elbs, mock_get_creds):
+        """Test ELB status filtering logic"""
+        mock_credentials = MockCredentialFixtures.get_scenario_credentials('simple')
+        mock_get_creds.return_value = mock_credentials
+        
+        # Create response with mixed ELB statuses
+        mixed_elbs = [
+            {
+                'LoadBalancerName': 'active-elb',
+                'DNSName': 'active-elb-123456789.us-east-1.elb.amazonaws.com',
+                'State': {'Code': 'active'},
+                'Type': 'application'
+            },
+            {
+                'LoadBalancerName': 'provisioning-elb',
+                'DNSName': 'provisioning-elb-123456789.us-east-1.elb.amazonaws.com',
+                'State': {'Code': 'provisioning'},
+                'Type': 'application'
+            },
+            {
+                'LoadBalancerName': 'failed-elb',
+                'DNSName': 'failed-elb-123456789.us-east-1.elb.amazonaws.com',
+                'State': {'Code': 'failed'},
+                'Type': 'application'
+            }
+        ]
+        mock_find_elbs.return_value = mixed_elbs
+        
+        # Test filtering for active status only
+        mock_args = MockOperationHelpers.create_mock_args(
+            pFragments=['all'], pStatus='active'
+        )
+        
+        with patch('inv_scr.operations.elbs.tqdm') as mock_tqdm:
+            mock_pbar = MagicMock()
+            mock_tqdm.return_value = mock_pbar
+            
+            elbs.run(mock_args)
+        
+        # Verify display was called
+        mock_display.assert_called_once()
+        display_args = mock_display.call_args[0][0]
+        
+        # Should have all 3 ELBs (filtering happens in AWS API, not in our logic)
+        self.assertEqual(len(display_args), 3)
+        for elb in display_args:
+            self.assertIn(elb['Status'], ['active', 'provisioning', 'failed'])
+
+    @patch('inv_scr.operations.elbs.get_all_credentials')
+    @patch('inv_scr.operations.elbs.Inventory_Modules.find_load_balancers2')
+    @patch('inv_scr.operations.elbs.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_fragment_filtering_logic(self, mock_stdout, mock_display, mock_find_elbs, mock_get_creds):
+        """Test ELB fragment filtering logic"""
+        mock_credentials = MockCredentialFixtures.get_scenario_credentials('simple')
+        mock_get_creds.return_value = mock_credentials
+        
+        # Create response with ELBs that match fragment
+        filtered_elbs = [
+            {
+                'LoadBalancerName': 'web-app-elb',
+                'DNSName': 'web-app-elb-123456789.us-east-1.elb.amazonaws.com',
+                'State': {'Code': 'active'},
+                'Type': 'application'
+            },
+            {
+                'LoadBalancerName': 'web-api-elb',
+                'DNSName': 'web-api-elb-123456789.us-east-1.elb.amazonaws.com',
+                'State': {'Code': 'active'},
+                'Type': 'application'
+            }
+        ]
+        mock_find_elbs.return_value = filtered_elbs
+        
+        # Test filtering for 'web' fragment
+        mock_args = MockOperationHelpers.create_mock_args(
+            pFragments=['web'], pStatus='active', pExact=False
+        )
+        
+        with patch('inv_scr.operations.elbs.tqdm') as mock_tqdm:
+            mock_pbar = MagicMock()
+            mock_tqdm.return_value = mock_pbar
+            
+            elbs.run(mock_args)
+        
+        # Verify display was called
+        mock_display.assert_called_once()
+        display_args = mock_display.call_args[0][0]
+        
+        # Should have 2 ELBs matching the fragment
+        self.assertEqual(len(display_args), 2)
+        for elb in display_args:
+            self.assertIn('web', elb['Name'].lower())
 
 
 class TestFunctionsOperation(unittest.TestCase):
@@ -1242,12 +1678,226 @@ class TestRdsInstancesOperation(unittest.TestCase):
         """Test that uniquify_list removes duplicate entries"""
         test_list = [
             {'DBId': 'db-1', 'Name': 'test1'},
-            {'DBId': 'db-2', 'Name': 'test2'},
-            {'DBId': 'db-1', 'Name': 'test1'},  # duplicate
-            {'DBId': 'db-3', 'Name': 'test3'}
+            {'DBId': 'db-1', 'Name': 'test1'},  # Duplicate
+            {'DBId': 'db-2', 'Name': 'test2'}
         ]
         
         result = rds_instances.uniquify_list(test_list)
+        
+        self.assertEqual(len(result), 2)
+        db_ids = [item['DBId'] for item in result]
+        self.assertEqual(db_ids, ['db-1', 'db-2'])
+
+    # Enhanced credential-level mocking tests for RDS Instances
+    @patch('inv_scr.operations.rds_instances.get_all_credentials')
+    @patch('inv_scr.operations.rds_instances.Inventory_Modules.find_account_rds_instances2')
+    @patch('inv_scr.operations.rds_instances.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_single_account_credentials(self, mock_stdout, mock_display, mock_find_rds, mock_get_creds):
+        """Test complete RDS instances run flow with single account credentials"""
+        # Use shared test data system
+        mock_credentials = MockCredentialFixtures.get_scenario_credentials('simple')
+        mock_get_creds.return_value = mock_credentials
+        
+        # Use scenario-based AWS response
+        mock_rds_response = MockAWSResponseFixtures.rds_instances_response(num_instances=2, scenario='simple')
+        mock_find_rds.return_value = mock_rds_response
+        
+        # Create mock args
+        mock_args = MockOperationHelpers.create_mock_args(
+            pFragments=['all'], pExact=False
+        )
+        
+        with patch('inv_scr.operations.rds_instances.tqdm') as mock_tqdm:
+            mock_pbar = MagicMock()
+            mock_tqdm.return_value = mock_pbar
+            
+            rds_instances.run(mock_args)
+        
+        # Verify credential handling
+        mock_get_creds.assert_called_once()
+        
+        # Verify AWS API was called with correct credentials
+        mock_find_rds.assert_called_once_with(mock_credentials[0])
+        
+        # Verify display was called with processed results
+        mock_display.assert_called_once()
+        display_args = mock_display.call_args[0][0]
+        
+        # Verify data transformation logic
+        self.assertEqual(len(display_args), 2)  # Should have 2 RDS instances
+        for instance in display_args:
+            self.assertEqual(instance['AccountNumber'], '123456789012')
+            self.assertEqual(instance['Region'], 'us-east-1')
+            self.assertEqual(instance['ParentProfile'], 'test-profile')
+            self.assertTrue(instance['DBId'].startswith('masteraccount'))
+            self.assertIn(instance['Engine'], ['mysql', 'postgres'])
+            self.assertEqual(instance['State'], 'available')
+
+    @patch('inv_scr.operations.rds_instances.get_all_credentials')
+    @patch('inv_scr.operations.rds_instances.Inventory_Modules.find_account_rds_instances2')
+    @patch('inv_scr.operations.rds_instances.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_multi_account_credentials(self, mock_stdout, mock_display, mock_find_rds, mock_get_creds):
+        """Test RDS instances operation across multiple accounts"""
+        mock_credentials = MockCredentialFixtures.get_scenario_credentials('multi_account')
+        mock_get_creds.return_value = mock_credentials
+        
+        # Mock different RDS responses for different accounts
+        def side_effect(credential):
+            account_id = credential['AccountId']
+            if account_id == '123456789012':  # master-account
+                return MockAWSResponseFixtures.rds_instances_response(2, scenario='simple')
+            elif account_id == '234567890123':  # dev-account
+                return MockAWSResponseFixtures.rds_instances_response(1, scenario='simple')
+            else:
+                return {'DBInstances': []}  # Empty response for third account
+        
+        mock_find_rds.side_effect = side_effect
+        
+        mock_args = MockOperationHelpers.create_mock_args(pFragments=['all'])
+        
+        with patch('inv_scr.operations.rds_instances.tqdm') as mock_tqdm:
+            mock_pbar = MagicMock()
+            mock_tqdm.return_value = mock_pbar
+            
+            rds_instances.run(mock_args)
+        
+        # Verify AWS API was called for each account
+        self.assertEqual(mock_find_rds.call_count, 3)
+        
+        # Verify display was called
+        mock_display.assert_called_once()
+        display_args = mock_display.call_args[0][0]
+        
+        # Should have RDS instances from first two accounts (2 + 1 = 3 total)
+        self.assertEqual(len(display_args), 3)
+        
+        # Verify account distribution
+        account_counts = {}
+        for instance in display_args:
+            account_id = instance['AccountNumber']
+            account_counts[account_id] = account_counts.get(account_id, 0) + 1
+        
+        self.assertEqual(account_counts.get('123456789012', 0), 2)
+        self.assertEqual(account_counts.get('234567890123', 0), 1)
+        self.assertEqual(account_counts.get('345678901234', 0), 0)
+
+    @patch('inv_scr.operations.rds_instances.get_all_credentials')
+    @patch('inv_scr.operations.rds_instances.Inventory_Modules.find_account_rds_instances2')
+    @patch('inv_scr.operations.rds_instances.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_fragment_filtering_logic(self, mock_stdout, mock_display, mock_find_rds, mock_get_creds):
+        """Test RDS instances fragment filtering logic"""
+        mock_credentials = MockCredentialFixtures.get_scenario_credentials('simple')
+        mock_get_creds.return_value = mock_credentials
+        
+        # Create response with mixed DB instance names
+        mixed_rds_response = {
+            'DBInstances': [
+                {
+                    'DBInstanceIdentifier': 'prod-mysql-db',
+                    'DBInstanceClass': 'db.t3.micro',
+                    'Engine': 'mysql',
+                    'DBInstanceStatus': 'available',
+                    'DBName': 'proddb',
+                    'AllocatedStorage': 20,
+                    'LatestRestorableTime': datetime(2023, 1, 2, 12, 0, 0)
+                },
+                {
+                    'DBInstanceIdentifier': 'dev-postgres-db',
+                    'DBInstanceClass': 'db.t3.small',
+                    'Engine': 'postgres',
+                    'DBInstanceStatus': 'available',
+                    'DBName': 'devdb',
+                    'AllocatedStorage': 50,
+                    'LatestRestorableTime': datetime(2023, 1, 2, 12, 0, 0)
+                },
+                {
+                    'DBInstanceIdentifier': 'test-mysql-db',
+                    'DBInstanceClass': 'db.t3.micro',
+                    'Engine': 'mysql',
+                    'DBInstanceStatus': 'available',
+                    'DBName': 'testdb',
+                    'AllocatedStorage': 10,
+                    'LatestRestorableTime': datetime(2023, 1, 2, 12, 0, 0)
+                }
+            ]
+        }
+        mock_find_rds.return_value = mixed_rds_response
+        
+        # Test filtering for 'prod' fragment
+        mock_args = MockOperationHelpers.create_mock_args(
+            pFragments=['prod'], pExact=False
+        )
+        
+        with patch('inv_scr.operations.rds_instances.tqdm') as mock_tqdm:
+            mock_pbar = MagicMock()
+            mock_tqdm.return_value = mock_pbar
+            
+            rds_instances.run(mock_args)
+        
+        # Verify display was called
+        mock_display.assert_called_once()
+        display_args = mock_display.call_args[0][0]
+        
+        # Should have all 3 instances (filtering happens in AWS API, not in our logic)
+        self.assertEqual(len(display_args), 3)
+        for instance in display_args:
+            self.assertIn(instance['DBId'], ['prod-mysql-db', 'dev-postgres-db', 'test-mysql-db'])
+
+    @patch('inv_scr.operations.rds_instances.get_all_credentials')
+    @patch('inv_scr.operations.rds_instances.Inventory_Modules.find_account_rds_instances2')
+    @patch('inv_scr.operations.rds_instances.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_uniquification_logic(self, mock_stdout, mock_display, mock_find_rds, mock_get_creds):
+        """Test RDS instances uniquification logic"""
+        mock_credentials = MockCredentialFixtures.get_scenario_credentials('simple')
+        mock_get_creds.return_value = mock_credentials
+        
+        # Create response with duplicate DB instances (simulating multi-region scenario)
+        duplicate_rds_response = {
+            'DBInstances': [
+                {
+                    'DBInstanceIdentifier': 'duplicate-db',
+                    'DBInstanceClass': 'db.t3.micro',
+                    'Engine': 'mysql',
+                    'DBInstanceStatus': 'available',
+                    'DBName': 'duplicatedb',
+                    'AllocatedStorage': 20,
+                    'LatestRestorableTime': datetime(2023, 1, 2, 12, 0, 0)
+                },
+                {
+                    'DBInstanceIdentifier': 'unique-db',
+                    'DBInstanceClass': 'db.t3.small',
+                    'Engine': 'postgres',
+                    'DBInstanceStatus': 'available',
+                    'DBName': 'uniquedb',
+                    'AllocatedStorage': 50,
+                    'LatestRestorableTime': datetime(2023, 1, 2, 12, 0, 0)
+                }
+            ]
+        }
+        mock_find_rds.return_value = duplicate_rds_response
+        
+        mock_args = MockOperationHelpers.create_mock_args(pFragments=['all'])
+        
+        with patch('inv_scr.operations.rds_instances.tqdm') as mock_tqdm:
+            mock_pbar = MagicMock()
+            mock_tqdm.return_value = mock_pbar
+            
+            rds_instances.run(mock_args)
+        
+        # Verify display was called
+        mock_display.assert_called_once()
+        display_args = mock_display.call_args[0][0]
+        
+        # Should have 2 unique instances
+        self.assertEqual(len(display_args), 2)
+        db_ids = [instance['DBId'] for instance in display_args]
+        self.assertEqual(len(set(db_ids)), 2)  # All unique
+        self.assertIn('duplicate-db', db_ids)
+        self.assertIn('unique-db', db_ids)
         
         self.assertEqual(len(result), 3)
         db_ids = [item['DBId'] for item in result]
