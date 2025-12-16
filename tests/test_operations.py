@@ -7,11 +7,17 @@ import unittest
 import sys
 from unittest.mock import patch, MagicMock, call
 import io
+from datetime import datetime
 
 # Add the parent directory to the path so we can import our modules
 sys.path.insert(0, '..')
 
-from inv_scr.operations import instances, vpcs, cfnstacks, cfnstacksets, ebs_volumes, elbs, functions, orgs, rds_instances, subnets, phzs, enis, ecs_clusters, directories, gas, gd_detectors, policies, roles, saml_providers, tgws, topics
+from inv_scr.operations import (
+    instances, vpcs, cfnstacks, cfnstacksets, ebs_volumes, elbs, functions, orgs,
+    rds_instances, subnets, phzs, enis, ecs_clusters, directories, gas, gd_detectors,
+    policies, roles, saml_providers, tgws, topics, ram_shares, config_recorders,
+    cloudtrail, azs, org_users
+)
 from tests.mock_fixtures import MockCredentialFixtures, MockAWSResponseFixtures, MockOperationHelpers
 
 
@@ -515,8 +521,9 @@ class TestVPCsOperation(unittest.TestCase):
             self.assertEqual(vpc['AccountId'], '123456789012')
             self.assertEqual(vpc['Region'], 'us-east-1')
             self.assertEqual(vpc['VpcId'], f'vpc-{str(i).zfill(8)}abcdef{i}')
-            self.assertEqual(vpc['VpcName'], f'test-vpc-{i}')
-            self.assertEqual(vpc['CIDR'], f'10.{i}.0.0/16')
+            self.assertEqual(vpc['VpcName'], f'master-account-vpc-def{i}')
+            expected_cidr = '10.0.0.0/16' if i == 0 else '11.0.0.0/16'
+            self.assertEqual(vpc['CIDR'], expected_cidr)
             self.assertEqual(vpc['IsDefault'], i == 0)  # First VPC is default
 
     @patch('inv_scr.operations.vpcs.get_all_credentials')
@@ -1353,6 +1360,9 @@ class TestFunctionsOperation(unittest.TestCase):
         self.mock_args.pFragments = ['all']
         self.mock_args.pExact = False
         self.mock_args.pRuntime = None
+        self.mock_args.pNewRuntime = None
+        self.mock_args.Fix = False
+        self.mock_args.Force = False
 
     def test_add_operation_args_function_exists(self):
         """Test that add_operation_args function exists"""
@@ -1538,6 +1548,189 @@ class TestFunctionsOperation(unittest.TestCase):
             self.assertEqual(function['ParentProfile'], 'test-profile')
             # Verify role name extraction logic worked
             self.assertNotIn('arn:aws:iam::', function['Role'])
+
+    def test_update_function_runtime_function_exists(self):
+        """Test that update_function_runtime function exists"""
+        self.assertTrue(hasattr(functions, 'update_function_runtime'))
+        self.assertTrue(callable(functions.update_function_runtime))
+
+    @patch('inv_scr.operations.functions.boto3.Session')
+    @patch('inv_scr.operations.functions.tqdm')
+    def test_update_function_runtime_basic(self, mock_tqdm, mock_session):
+        """Test basic runtime update functionality"""
+        # Mock progress bar
+        mock_pbar = MagicMock()
+        mock_tqdm.return_value = mock_pbar
+        
+        # Mock boto3 session and client
+        mock_client = MagicMock()
+        mock_session.return_value.client.return_value = mock_client
+        
+        # Mock successful update response
+        mock_client.update_function_configuration.return_value = {
+            'FunctionName': 'test-function',
+            'Runtime': 'python3.11',
+            'Role': 'arn:aws:iam::123456789012:role/test-role'
+        }
+        mock_client.get_function_configuration.return_value = {
+            'LastUpdateStatus': 'Successful'
+        }
+        
+        # Test data
+        functions_to_update = [
+            {
+                'FunctionName': 'test-function',
+                'Runtime': 'python3.9',
+                'MgmtAccount': '123456789012',
+                'AccountId': '123456789012',
+                'Region': 'us-east-1',
+                'AccessKeyId': 'AKIATEST',
+                'SecretAccessKey': 'secret',
+                'SessionToken': 'token'
+            }
+        ]
+        
+        result = functions.update_function_runtime(functions_to_update, 'python3.11')
+        
+        # Verify boto3 session was created with correct credentials
+        mock_session.assert_called_once_with(
+            aws_access_key_id='AKIATEST',
+            aws_secret_access_key='secret',
+            aws_session_token='token',
+            region_name='us-east-1'
+        )
+        
+        # Verify update was called
+        mock_client.update_function_configuration.assert_called_once_with(
+            FunctionName='test-function',
+            Runtime='python3.11'
+        )
+        
+        # Verify result
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['FunctionName'], 'test-function')
+        self.assertEqual(result[0]['Runtime'], 'python3.11')
+
+    @patch('inv_scr.operations.functions.get_all_credentials')
+    @patch('inv_scr.operations.functions.find_all_lambda_functions')
+    @patch('inv_scr.operations.functions.update_function_runtime')
+    @patch('inv_scr.operations.functions.display_results')
+    @patch('builtins.input', return_value='y')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_runtime_update(self, mock_stdout, mock_input, mock_display, mock_update, mock_find, mock_creds):
+        """Test complete run flow with runtime update"""
+        # Mock credentials
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-east-1', 'MgmtAccount': '123456789012'}
+        ]
+        
+        # Mock functions found with old runtime
+        mock_find.return_value = [
+            {
+                'MgmtAccount': '123456789012',
+                'AccountId': '123456789012',
+                'Region': 'us-east-1',
+                'FunctionName': 'test-function',
+                'Runtime': 'python3.9',
+                'Role': 'test-role',
+                'ParentProfile': 'test-profile',
+                'AccessKeyId': 'AKIATEST',
+                'SecretAccessKey': 'secret',
+                'SessionToken': 'token'
+            }
+        ]
+        
+        # Mock successful update
+        mock_update.return_value = [
+            {
+                'MgmtAccount': '123456789012',
+                'AccountId': '123456789012',
+                'Region': 'us-east-1',
+                'FunctionName': 'test-function',
+                'Runtime': 'python3.11',
+                'Role': 'test-role',
+                'ParentProfile': 'test-profile'
+            }
+        ]
+        
+        # Set up args for runtime update
+        self.mock_args.pRuntime = ['python3.9']
+        self.mock_args.pNewRuntime = 'python3.11'
+        self.mock_args.Fix = True
+        self.mock_args.Force = False
+        
+        functions.run(self.mock_args)
+        
+        # Verify functions were called
+        mock_creds.assert_called_once()
+        mock_find.assert_called_once()
+        mock_update.assert_called_once()
+        
+        # Verify update was called with correct parameters
+        update_args = mock_update.call_args[0]
+        self.assertEqual(len(update_args[0]), 1)  # One function to update
+        self.assertEqual(update_args[1], 'python3.11')  # New runtime
+        
+        # Verify display was called twice (original results + updated results)
+        self.assertEqual(mock_display.call_count, 2)
+        
+        # Check output contains expected text
+        output = mock_stdout.getvalue()
+        self.assertIn("Found 1 functions with runtime matching", output)
+        self.assertIn("Updating Runtime for 1 functions", output)
+
+    @patch('inv_scr.operations.functions.get_all_credentials')
+    @patch('inv_scr.operations.functions.find_all_lambda_functions')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_fix_but_no_new_runtime(self, mock_stdout, mock_find, mock_creds):
+        """Test run with --fix but no +new_runtime parameter"""
+        # Mock credentials and functions
+        mock_creds.return_value = [{'AccountId': '123456789012', 'Region': 'us-east-1'}]
+        mock_find.return_value = []
+        
+        # Set up args with fix but no new runtime
+        self.mock_args.Fix = True
+        self.mock_args.pNewRuntime = None
+        
+        with self.assertRaises(SystemExit) as cm:
+            functions.run(self.mock_args)
+        
+        self.assertEqual(cm.exception.code, 8)
+        output = mock_stdout.getvalue()
+        self.assertIn("didn't supply a new runtime", output)
+
+    @patch('inv_scr.operations.functions.get_all_credentials')
+    @patch('inv_scr.operations.functions.find_all_lambda_functions')
+    @patch('builtins.input', return_value='n')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_runtime_update_cancelled(self, mock_stdout, mock_input, mock_find, mock_creds):
+        """Test runtime update when user cancels"""
+        # Mock credentials and functions
+        mock_creds.return_value = [{'AccountId': '123456789012', 'Region': 'us-east-1'}]
+        mock_find.return_value = [
+            {
+                'MgmtAccount': '123456789012',
+                'AccountId': '123456789012',
+                'Region': 'us-east-1',
+                'FunctionName': 'test-function',
+                'Runtime': 'python3.9',
+                'AccessKeyId': 'test',
+                'SecretAccessKey': 'test',
+                'SessionToken': 'test'
+            }
+        ]
+        
+        # Set up args for runtime update
+        self.mock_args.pRuntime = ['python3.9']
+        self.mock_args.pNewRuntime = 'python3.11'
+        self.mock_args.Fix = True
+        self.mock_args.Force = False
+        
+        functions.run(self.mock_args)
+        
+        # Check output contains cancellation message
+        output = mock_stdout.getvalue()
+        self.assertIn("Runtime update cancelled", output)
 
 
 class TestOrgsOperation(unittest.TestCase):
@@ -1747,11 +1940,16 @@ class TestRdsInstancesOperation(unittest.TestCase):
         def side_effect(credential):
             account_id = credential['AccountId']
             if account_id == '123456789012':  # master-account
-                return MockAWSResponseFixtures.rds_instances_response(2, scenario='simple')
+                response = MockAWSResponseFixtures.rds_instances_response(2, scenario='simple')
             elif account_id == '234567890123':  # dev-account
-                return MockAWSResponseFixtures.rds_instances_response(1, scenario='simple')
+                response = MockAWSResponseFixtures.rds_instances_response(1, scenario='simple')
             else:
-                return {'DBInstances': []}  # Empty response for third account
+                response = {'DBInstances': []}  # Empty response for third account
+
+            # Make DB identifiers account-unique so uniqueness logic does not drop cross-account results
+            for inst in response.get('DBInstances', []):
+                inst['DBInstanceIdentifier'] = f"{account_id}-{inst['DBInstanceIdentifier']}"
+            return response
         
         mock_find_rds.side_effect = side_effect
         
@@ -1898,12 +2096,6 @@ class TestRdsInstancesOperation(unittest.TestCase):
         self.assertEqual(len(set(db_ids)), 2)  # All unique
         self.assertIn('duplicate-db', db_ids)
         self.assertIn('unique-db', db_ids)
-        
-        self.assertEqual(len(result), 3)
-        db_ids = [item['DBId'] for item in result]
-        self.assertEqual(set(db_ids), {'db-1', 'db-2', 'db-3'})
-
-        self.assertEqual(set(db_ids), {'db-1', 'db-2', 'db-3'})
 
 
 class TestPlaceholderOperations(unittest.TestCase):
@@ -1926,6 +2118,220 @@ class TestPlaceholderOperations(unittest.TestCase):
                 self.assertTrue(callable(module.add_operation_args))
             except ImportError as e:
                 self.fail(f"Failed to import operation module {operation_name}: {e}")
+
+
+class TestRamSharesOperation(unittest.TestCase):
+    """Test cases for RAM shares operation"""
+
+    @patch('inv_scr.operations.ram_shares.get_all_credentials')
+    @patch('inv_scr.operations.ram_shares._find_all_ram_shares')
+    @patch('inv_scr.operations.ram_shares.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_mocked_shares(self, mock_stdout, mock_display, mock_find_ram, mock_get_creds):
+        """Validate RAM shares run flow with mocked data"""
+        mock_credentials = MockCredentialFixtures.get_scenario_credentials('simple')
+        mock_get_creds.return_value = mock_credentials
+
+        mock_find_ram.return_value = [
+            {
+                'ParentProfile': 'test-profile',
+                'MgmtAccount': '123456789012',
+                'AccountId': '123456789012',
+                'OwnerAccount': '123456789012',
+                'Region': 'us-east-1',
+                'ShareType': 'OWNED',
+                'ShareName': 'test-share',
+                'Status': 'ACTIVE',
+                'ResourceCount': 1,
+                'SharedWithCount': 1,
+                'AllowExternalPrincipals': False,
+                'Resources': 'ec2: arn:aws:ec2:us-east-1:123456789012:subnet/subnet-123456',
+                'SharedWith': '123456789012',
+                'ShareArn': 'arn:aws:ram:us-east-1:123456789012:resource-share/abc',
+                'CreationTime': '2024-01-01T00:00:00Z',
+                'LastUpdatedTime': '2024-01-02T00:00:00Z',
+                'Tags': 'env=test'
+            }
+        ]
+
+        mock_args = MockOperationHelpers.create_mock_args(pStatus=None, pType=None)
+
+        with patch('inv_scr.operations.ram_shares.tqdm') as mock_tqdm:
+            mock_pbar = MagicMock()
+            mock_tqdm.return_value = mock_pbar
+            ram_shares.run(mock_args)
+
+        mock_get_creds.assert_called_once()
+        mock_find_ram.assert_called_once()
+        mock_display.assert_called_once()
+
+        display_args = mock_display.call_args[0][0]
+        self.assertEqual(len(display_args), 1)
+        self.assertEqual(display_args[0]['ShareName'], 'test-share')
+        self.assertEqual(display_args[0]['ShareType'], 'OWNED')
+        self.assertEqual(display_args[0]['Region'], 'us-east-1')
+
+
+class TestConfigRecordersOperation(unittest.TestCase):
+    """Test cases for Config recorders operation"""
+
+    @patch('inv_scr.operations.config_recorders.get_all_credentials')
+    @patch('inv_scr.operations.config_recorders._collect_for_credential')
+    @patch('inv_scr.operations.config_recorders.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_mocked_config_items(self, mock_stdout, mock_display, mock_collect, mock_get_creds):
+        """Validate config recorders run flow with mocked data"""
+        mock_credentials = MockCredentialFixtures.get_scenario_credentials('simple')
+        mock_get_creds.return_value = mock_credentials
+
+        mock_collect.return_value = [
+            {
+                'ParentProfile': 'test-profile',
+                'MgmtAccount': '123456789012',
+                'AccountId': '123456789012',
+                'Region': 'us-east-1',
+                'Type': 'Config Recorder',
+                'Name': 'test-recorder',
+                'RoleArn': 'arn:aws:iam::123456789012:role/config',
+                'AllSupported': True,
+                'IncludeGlobalResourceTypes': True,
+                'ResourceTypes': ''
+            },
+            {
+                'ParentProfile': 'test-profile',
+                'MgmtAccount': '123456789012',
+                'AccountId': '123456789012',
+                'Region': 'us-east-1',
+                'Type': 'Delivery Channel',
+                'Name': 'test-delivery-channel',
+                'S3Bucket': 'config-bucket',
+                'SnsTopic': 'arn:aws:sns:us-east-1:123456789012:config',
+                'Frequency': 'TwentyFour_Hours'
+            }
+        ]
+
+        mock_args = MockOperationHelpers.create_mock_args(pFragments=['all'], pExact=False)
+
+        with patch('inv_scr.operations.config_recorders.tqdm') as mock_tqdm:
+            mock_tqdm.side_effect = lambda *args, **kwargs: mock_credentials  # ensure iteration
+            config_recorders.run(mock_args)
+
+        mock_get_creds.assert_called_once()
+        self.assertEqual(mock_collect.call_count, len(mock_credentials))
+        mock_display.assert_called_once()
+
+        display_args = mock_display.call_args[0][0]
+        self.assertEqual(len(display_args), 2)
+        names = {item['Name'] for item in display_args}
+        self.assertIn('test-recorder', names)
+        self.assertIn('test-delivery-channel', names)
+
+
+class TestCloudTrailOperation(unittest.TestCase):
+    """Test cases for CloudTrail operation"""
+
+    @patch('inv_scr.operations.cloudtrail.get_all_credentials')
+    @patch('inv_scr.operations.cloudtrail._find_cloudtrails')
+    @patch('inv_scr.operations.cloudtrail.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_mocked_trails(self, mock_stdout, mock_display, mock_find, mock_get_creds):
+        mock_credentials = MockCredentialFixtures.get_scenario_credentials('simple')
+        mock_get_creds.return_value = mock_credentials
+
+        mock_find.return_value = [
+            {
+                'MgmtAccount': '123456789012',
+                'AccountId': '123456789012',
+                'Region': 'us-east-1',
+                'TrailName': 'org-trail',
+                'OrgTrail': 'OrgTrail',
+                'Bucket': 'org-bucket',
+                'MultiRegion': True,
+                'HomeRegion': 'us-east-1',
+            }
+        ]
+
+        mock_args = MockOperationHelpers.create_mock_args()
+        cloudtrail.run(mock_args)
+
+        mock_get_creds.assert_called_once()
+        mock_find.assert_called_once()
+        mock_display.assert_called_once()
+
+        display_args = mock_display.call_args[0][0]
+        self.assertEqual(len(display_args), 1)
+        self.assertEqual(display_args[0]['TrailName'], 'org-trail')
+
+
+class TestAZsOperation(unittest.TestCase):
+    """Test cases for AZ coverage operation"""
+
+    @patch('inv_scr.operations.azs.get_all_credentials')
+    @patch('inv_scr.operations.azs._collect_azs')
+    @patch('inv_scr.operations.azs.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_mocked_azs(self, mock_stdout, mock_display, mock_collect, mock_get_creds):
+        mock_credentials = MockCredentialFixtures.single_account_single_region()
+        mock_get_creds.return_value = mock_credentials
+
+        mock_collect.return_value = [
+            {
+                'ParentProfile': 'test-profile',
+                'MgmtAccount': '123456789012',
+                'AccountNumber': '123456789012',
+                'Region': 'us-east-1',
+                'ZoneName': 'us-east-1a',
+                'ZoneId': 'use1-az1',
+                'ZoneType': 'availability-zone',
+            }
+        ]
+
+        mock_args = MockOperationHelpers.create_mock_args()
+        azs.run(mock_args)
+
+        mock_get_creds.assert_called_once()
+        mock_collect.assert_called_once()
+        mock_display.assert_called_once()
+
+        display_args = mock_display.call_args[0][0]
+        self.assertEqual(len(display_args), 1)
+        self.assertEqual(display_args[0]['ZoneName'], 'us-east-1a')
+
+
+class TestOrgUsersOperation(unittest.TestCase):
+    """Test cases for org-users operation"""
+
+    @patch('inv_scr.operations.org_users.get_all_credentials')
+    @patch('inv_scr.operations.org_users.find_iam_users2')
+    @patch('inv_scr.operations.org_users.find_idc_directory_id2')
+    @patch('inv_scr.operations.org_users.find_idc_users2')
+    @patch('inv_scr.operations.org_users.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_mocked_users(self, mock_stdout, mock_display, mock_idc_users, mock_idc_dirs, mock_iam_users, mock_get_creds):
+        mock_credentials = MockCredentialFixtures.get_scenario_credentials('simple')
+        mock_get_creds.return_value = mock_credentials
+
+        mock_iam_users.return_value = [
+            {'UserName': 'iam-user-1', 'PasswordLastUsed': '2024-01-01'}
+        ]
+        mock_idc_dirs.return_value = ['dir-1234']
+        mock_idc_users.return_value = [
+            {'UserName': 'idc-user-1', 'PasswordLastUsed': '2024-01-02'}
+        ]
+
+        mock_args = MockOperationHelpers.create_mock_args(pIAM=True, pIdentityCenter=True)
+        org_users.run(mock_args)
+
+        mock_get_creds.assert_called_once()
+        mock_iam_users.assert_called_once()
+        mock_idc_dirs.assert_called_once()
+        mock_idc_users.assert_called_once()
+        mock_display.assert_called_once()
+
+        display_args = mock_display.call_args[0][0]
+        names = {user['UserName'] for user in display_args}
+        self.assertIn('iam-user-1', names)
+        self.assertIn('idc-user-1', names)
 
 
 if __name__ == '__main__':

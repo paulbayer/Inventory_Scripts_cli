@@ -273,37 +273,41 @@ class MockAWSResponseFixtures:
         return {'Stacks': stacks}
     
     @staticmethod
-    def rds_instances_response(num_instances: int = 2) -> Dict[str, Any]:
-        """Mock RDS describe_db_instances response"""
-        instances = []
-        
-        for i in range(num_instances):
-            instances.append({
-                'DBInstanceIdentifier': f'test-db-{i}',
-                'DBInstanceClass': 'db.t3.micro',
-                'Engine': 'mysql' if i % 2 == 0 else 'postgres',
-                'DBInstanceStatus': 'available',
-                'MasterUsername': 'admin',
-                'DBName': f'testdb{i}',
-                'AllocatedStorage': 20,
-                'InstanceCreateTime': '2023-01-01T12:00:00.000Z',
-                'VpcSecurityGroups': [
-                    {
-                        'VpcSecurityGroupId': f'sg-{str(i).zfill(8)}example',
-                        'Status': 'active'
-                    }
-                ],
-                'DBSubnetGroup': {
-                    'DBSubnetGroupName': f'test-subnet-group-{i}',
-                    'VpcId': f'vpc-{str(i).zfill(8)}example'
-                },
-                'MultiAZ': False,
-                'PubliclyAccessible': False,
-                'StorageType': 'gp2',
-                'StorageEncrypted': True
-            })
-        
-        return {'DBInstances': instances}
+    def rds_instances_response(num_instances: int = 2, scenario: str = 'simple') -> Dict[str, Any]:
+        """Mock RDS describe_db_instances response (supports scenarios)"""
+        # Reuse shared test data builder; fall back to legacy structure for backward compatibility.
+        try:
+            return ResponseBuilder.build_rds_response(scenario, num_instances)
+        except ValueError:
+            instances = []
+            
+            for i in range(num_instances):
+                instances.append({
+                    'DBInstanceIdentifier': f'test-db-{i}',
+                    'DBInstanceClass': 'db.t3.micro',
+                    'Engine': 'mysql' if i % 2 == 0 else 'postgres',
+                    'DBInstanceStatus': 'available',
+                    'MasterUsername': 'admin',
+                    'DBName': f'testdb{i}',
+                    'AllocatedStorage': 20,
+                    'LatestRestorableTime': datetime(2023, 1, 2, 12, 0, 0),
+                    'VpcSecurityGroups': [
+                        {
+                            'VpcSecurityGroupId': f'sg-{str(i).zfill(8)}example',
+                            'Status': 'active'
+                        }
+                    ],
+                    'DBSubnetGroup': {
+                        'DBSubnetGroupName': f'test-subnet-group-{i}',
+                        'VpcId': f'vpc-{str(i).zfill(8)}example'
+                    },
+                    'MultiAZ': False,
+                    'PubliclyAccessible': False,
+                    'StorageType': 'gp2',
+                    'StorageEncrypted': True
+                })
+            
+            return {'DBInstances': instances}
 
 
 class MockOperationHelpers:

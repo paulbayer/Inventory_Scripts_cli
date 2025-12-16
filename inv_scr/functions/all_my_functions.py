@@ -16,7 +16,7 @@ from os.path import split
 import logging
 
 init()
-__version__ = "2024.06.05"
+__version__ = "2025.12.16"
 
 ERASE_LINE = '\x1b[2K'
 begin_time = time()
@@ -52,7 +52,7 @@ def parse_args(fargs):
 		default=None,
 		help="Language runtime(s) you're looking for within your accounts")
 	local.add_argument(
-		"--new_runtime", "--new", "--new-runtime",
+		"+new_runtime", "+new", "+new-runtime",
 		dest="NewRuntime",
 		metavar="language and version",
 		default=None,

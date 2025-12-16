@@ -13,7 +13,8 @@ from inv_scr.operations import (
     instances, vpcs, cfnstacks, cfnstacksets, directories, 
     ebs_volumes, ecs_clusters, elbs, enis, functions,
     gas, gd_detectors, orgs, phzs, policies, rds_instances,
-    roles, saml_providers, subnets, tgws, topics
+    roles, saml_providers, subnets, tgws, topics, ram_shares,
+    config_recorders, cloudtrail, azs, org_users
 )
 
 init()
@@ -23,6 +24,9 @@ __version__ = "2025.07.10"
 OPERATIONS = {
     'cfnstacks': cfnstacks.run,
     'cfnstacksets': cfnstacksets.run,
+    'cloudtrail': cloudtrail.run,
+    'azs': azs.run,
+    'org-users': org_users.run,
     'directories': directories.run,
     'ebs-volumes': ebs_volumes.run,
     'ecs-clusters': ecs_clusters.run,
@@ -35,12 +39,14 @@ OPERATIONS = {
     'orgs': orgs.run,
     'phzs': phzs.run,
     'policies': policies.run,
+    'ram-shares': ram_shares.run,
     'rds-instances': rds_instances.run,
     'roles': roles.run,
     'saml-providers': saml_providers.run,
     'subnets': subnets.run,
     'tgws': tgws.run,
     'topics': topics.run,
+    'config-recorders': config_recorders.run,
     'vpcs': vpcs.run,
 }
 
@@ -103,10 +109,15 @@ def list_operations():
         'functions': 'Find Lambda functions',
         'gas': 'Find Global Accelerator accelerators',
         'gd-detectors': 'Find GuardDuty detectors',
+        'config-recorders': 'Find Config recorders and delivery channels',
+        'cloudtrail': 'Find CloudTrail coverage',
+        'azs': 'Find availability zone coverage',
         'orgs': 'Find AWS Organizations information',
         'phzs': 'Find Private Hosted Zones',
         'policies': 'Find IAM policies',
+        'ram-shares': 'Find AWS RAM resource shares',
         'rds-instances': 'Find RDS instances',
+        'org-users': 'Find IAM and Identity Center users',
         'roles': 'Find IAM roles',
         'saml-providers': 'Find SAML identity providers',
         'subnets': 'Find VPC subnets',
