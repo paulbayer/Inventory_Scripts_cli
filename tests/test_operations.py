@@ -1451,7 +1451,7 @@ class TestFunctionsOperation(unittest.TestCase):
         mock_find_account.return_value = mock_functions_list
         
         # Create mock args using helper
-        mock_args = MockOperationHelpers.create_mock_args(pFragments=['all'], pRuntime=None)
+        mock_args = MockOperationHelpers.create_mock_args(pFragments=['all'], pRuntime=None, Fix=False, pNewRuntime=None)
         
         with patch('inv_scr.operations.functions.tqdm') as mock_tqdm:
             mock_pbar = MagicMock()
@@ -1525,7 +1525,7 @@ class TestFunctionsOperation(unittest.TestCase):
         mock_find_account.return_value = mock_functions_list
         
         # Test filtering for Python runtime only
-        mock_args = MockOperationHelpers.create_mock_args(pFragments=['all'], pRuntime=['python'])
+        mock_args = MockOperationHelpers.create_mock_args(pFragments=['all'], pRuntime=['python'], Fix=False, pNewRuntime=None)
         
         with patch('inv_scr.operations.functions.tqdm') as mock_tqdm:
             mock_pbar = MagicMock()
@@ -1714,6 +1714,7 @@ class TestFunctionsOperation(unittest.TestCase):
                 'Region': 'us-east-1',
                 'FunctionName': 'test-function',
                 'Runtime': 'python3.9',
+                'ParentProfile': 'test-profile',
                 'AccessKeyId': 'test',
                 'SecretAccessKey': 'test',
                 'SessionToken': 'test'
