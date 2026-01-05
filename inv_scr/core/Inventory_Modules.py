@@ -1,6 +1,6 @@
 import logging
 
-__version__ = "2025.04.03"
+__version__ = "2026.01.06"
 
 """
 ** Why are some functions "function" vs. "function2" vs. "function3"?**

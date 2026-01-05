@@ -19,8 +19,11 @@ inv_scr/core/exceptions.py
 inv_scr/core/timing.py
 inv_scr/core/vpc_modules.py
 inv_scr/operations/__init__.py
+inv_scr/operations/azs.py
 inv_scr/operations/cfnstacks.py
 inv_scr/operations/cfnstacksets.py
+inv_scr/operations/cloudtrail.py
+inv_scr/operations/config_recorders.py
 inv_scr/operations/directories.py
 inv_scr/operations/ebs_volumes.py
 inv_scr/operations/ecs_clusters.py
@@ -30,9 +33,11 @@ inv_scr/operations/functions.py
 inv_scr/operations/gas.py
 inv_scr/operations/gd_detectors.py
 inv_scr/operations/instances.py
+inv_scr/operations/org_users.py
 inv_scr/operations/orgs.py
 inv_scr/operations/phzs.py
 inv_scr/operations/policies.py
+inv_scr/operations/ram_shares.py
 inv_scr/operations/rds_instances.py
 inv_scr/operations/roles.py
 inv_scr/operations/saml_providers.py
