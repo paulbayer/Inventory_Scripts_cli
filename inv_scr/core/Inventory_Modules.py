@@ -4705,7 +4705,7 @@ def display_results(results_list, fdisplay_dict: dict, defaultAction=None, file_
 				elif isinstance(result[field], float):
 					print(f"{result[field]:{data_format}f}", end='')
 				elif isinstance(result[field], datetime):
-					print(f"{result[field].strftime('%x %X')}", end='')
+					print(f"{result[field].strftime('%x %X')} ", end='')
 				elif isinstance(result[field], list) and SubDisplay:
 					# Re-use this same function - but with the sub-data used for display, while passing in that this is a "sub-display" to indent the new records.
 					display_results(result[field], value['SubDisplay'], None, subdisplay=SubDisplay)
