@@ -4568,13 +4568,16 @@ def display_results(results_list, fdisplay_dict: dict, defaultAction=None, file_
 	                'MgmtAccount'  : {'DisplayOrder': 2, 'Heading': 'Mgmt Acct'},
 	                'AccountId'    : {'DisplayOrder': 3, 'Heading': 'Acct Number'},
 	                'Region'       : {'DisplayOrder': 4, 'Heading': 'Region', 'Condition': ['us-east-2']},
-	                'Retention'    : {'DisplayOrder': 5, 'Heading': 'Days Retention', 'Condition': ['Never']},
+	                'Retention'    : {'DisplayOrder': 5, 'Heading': 'Days Retention', 'Condition': ['Never'], 'ConditionType': 'not_equals'},
 	                'Name'         : {'DisplayOrder': 7, 'Heading': 'CW Log Name'},
                     'Size'         : {'DisplayOrder': 6, 'Heading': 'Size (Bytes)'}}
 		- The first field ("MgmtAccount") should match the field name within the list of dictionaries you're passing in (results_list)
 		- The first field within the nested dictionary is the SortOrder you want the results to show up in
 		- The second field within the nested dictionary is the heading you want to display at the top of the column (which allows spaces)
-		- The third field ('Condition') is new, and allows to highlight a special value within the output. This can be used multiple times. 
+		- The third field ('Condition') is optional, and allows to highlight a special value within the output. This can be used multiple times. 
+		- The fourth field ('ConditionType') is optional, and specifies how to use the Condition:
+		  * 'equals' (default): Highlight when the field value is IN the Condition list
+		  * 'not_equals': Highlight when the field value is NOT IN the Condition list
 		The dictionary doesn't have to be ordered, as long as the 'SortOrder' field is correct.
 
 		Enhancements:
@@ -4678,25 +4681,31 @@ def display_results(results_list, fdisplay_dict: dict, defaultAction=None, file_
 					result[field] = defaultAction
 				# This allows for a condition to highlight a specific value
 				highlight = False
-				if 'Condition' in value and result[field] in value['Condition']:
-					highlight = True
+				if 'Condition' in value:
+					condition_type = value.get('ConditionType', 'equals')  # Default to 'equals' for backward compatibility
+					if condition_type == 'equals':
+						highlight = result[field] in value['Condition']
+					elif condition_type == 'not_equals':
+						highlight = result[field] not in value['Condition']
+				# TODO: This highlights only the specific field that was matched. Thinking about whether it's better to highlight the whole line.
+				print(f"{Fore.RED if highlight else ''}", end='')
 				if result[field] is None:
 					print(f"{'':{data_format}} ", end='')
 				elif isinstance(result[field], str):
-					print(f"{Fore.RED if highlight else ''}{result[field]:{data_format}s}{Fore.RESET if highlight else ''} ", end='')
+					print(f"{result[field]:{data_format}s} ", end='')
 				elif isinstance(result[field], bool):
 					# This is needed, otherwise it prints "0" for False and "1" for True... Essentially treating the bool like an integer.
 					if result[field]:
 						display_text = 'True'
 					else:
 						display_text = 'False'
-					print(f"{Fore.RED if highlight else ''}{display_text:{data_format}s}{Fore.RESET if highlight else ''} ", end='')
+					print(f"{display_text:{data_format}s}", end='')
 				elif isinstance(result[field], int):
-					print(f"{Fore.RED if highlight else ''}{result[field]:<{data_format}{',' if 'Delimiter' in value.keys() and value['Delimiter'] else ''}}{Fore.RESET if highlight else ''} ", end='')
+					print(f"{result[field]:<{data_format}{',' if 'Delimiter' in value.keys() and value['Delimiter'] else ''}}", end='')
 				elif isinstance(result[field], float):
-					print(f"{Fore.RED if highlight else ''}{result[field]:{data_format}f}{Fore.RESET if highlight else ''} ", end='')
+					print(f"{result[field]:{data_format}f}", end='')
 				elif isinstance(result[field], datetime):
-					print(f"{Fore.RED if highlight else ''}{result[field].strftime('%x %X')}{Fore.RESET if highlight else ''} ", end='')
+					print(f"{result[field].strftime('%x %X')}", end='')
 				elif isinstance(result[field], list) and SubDisplay:
 					# Re-use this same function - but with the sub-data used for display, while passing in that this is a "sub-display" to indent the new records.
 					display_results(result[field], value['SubDisplay'], None, subdisplay=SubDisplay)
@@ -4706,19 +4715,20 @@ def display_results(results_list, fdisplay_dict: dict, defaultAction=None, file_
 						if isinstance(item, dict):
 							logging.debug(f"Item is a dictionary - {item}")
 							if 'CidrIp' in item.keys() and 'Description' in item.keys():
-								print(f"{Fore.RED if highlight else ''}{item['CidrIp']} ({item['Description']}){Fore.RESET if highlight else ''}, ", end='')
+								print(f"{item['CidrIp']} ({item['Description']})", end='')
 							elif 'CidrIp' in item.keys():
-								print(f"{Fore.RED if highlight else ''}{item['CidrIp']}{Fore.RESET if highlight else ''}, ", end='')
+								print(f"{item['CidrIp']}", end='')
 							elif 'GroupId' in item.keys() and 'Description' in item.keys():
-								print(f"{Fore.RED if highlight else ''}{item['GroupId']} ({item['Description']}){Fore.RESET if highlight else ''}, ", end='')
+								print(f"{item['GroupId']} ({item['Description']})", end='')
 							elif 'GroupId' in item.keys():
-								print(f"{Fore.RED if highlight else ''}{item['GroupId']}{Fore.RESET if highlight else ''}, ", end='')
+								print(f"{item['GroupId']}", end='')
 							elif 'PrefixListId' in item.keys() and 'Description' in item.keys():
-								print(f"{Fore.RED if highlight else ''}{item['PrefixListId']} ({item['Description']}){Fore.RESET if highlight else ''}, ", end='')
+								print(f"{item['PrefixListId']} ({item['Description']})", end='')
 							elif 'PrefixListId' in item.keys():
-								print(f"{Fore.RED if highlight else ''}{item['PrefixListId']}{Fore.RESET if highlight else ''}, ", end='')
+								print(f"{item['PrefixListId']}", end='')
 						else:
-							print(f"{Fore.RED if highlight else ''}{item}{Fore.RESET if highlight else ''}, ", end='')
+							print(f"{item}", end='')
+				print(f"{Fore.RESET if highlight else ''}", end='')
 			print()  # This is the end of line character needed at the end of every line
 		print()  # This is the new line needed at the end of the script.
 		# TODO: We need to add some analytics here... Trying to come up with what would make sense across all displays.
@@ -4726,7 +4736,9 @@ def display_results(results_list, fdisplay_dict: dict, defaultAction=None, file_
 		# This is where the data is written to a file
 		if file_to_save is not None:
 			Heading = ''
-			my_filename = f'{file_to_save}-{datetime.now().strftime("%y-%m-%d--%H-%M-%S")}'
+			# The "file_to_save" might have an extension that we don't want to use. We only use the beginning of the filename here
+			# TODO: We could use the extension they supply, if we default the extension value, in case they don't supply one.
+			my_filename = f'{file_to_save.split(".")[0]}-{datetime.now().strftime("%y-%m-%d--%H-%M-%S")}.csv'
 			logging.info(f"Writing your data to: {my_filename}")
 			with open(my_filename, 'w') as savefile:
 				for field, value in sorted_display_dict.items():
@@ -4756,7 +4768,7 @@ def display_results(results_list, fdisplay_dict: dict, defaultAction=None, file_
 							row += f"{result[field].strftime('%c')}|"
 					row += '\n'
 					savefile.write(row)
-			print(f"Data written to {my_filename}")
+			print(f"\nData written to {my_filename}\n")
 			print("If your data had a sub-display for additional data, it cannot be written to file yet... ")
 
 	def handle_dict():
@@ -4829,8 +4841,12 @@ def display_results(results_list, fdisplay_dict: dict, defaultAction=None, file_
 					row_data[field] = defaultAction
 				# This allows for a condition to highlight a specific value
 				highlight = False
-				if 'Condition' in value and row_data[field] in value['Condition']:
-					highlight = True
+				if 'Condition' in value:
+					condition_type = value.get('ConditionType', 'equals')  # Default to 'equals' for backward compatibility
+					if condition_type == 'equals':
+						highlight = row_data[field] in value['Condition']
+					elif condition_type == 'not_equals':
+						highlight = row_data[field] not in value['Condition']
 				if row_data[field] is None:
 					print(f"{'':{data_format}} ", end='')
 				elif isinstance(row_data[field], str):
@@ -4854,6 +4870,8 @@ def display_results(results_list, fdisplay_dict: dict, defaultAction=None, file_
 		#   Possibly we can have a setting where this data is written to a csv locally. We could create separate analytics once the data was saved.
 		if file_to_save is not None:
 			Heading = ''
+			# The "file_to_save" might have an extension that we don't want to use. We only use the beginning of the filename here
+			# TODO: We could use the extension they supply, if we default the extension value, in case they don't supply one.
 			my_filename = f'{file_to_save.split(".")[0]}-{datetime.now().strftime("%y-%m-%d--%H-%M-%S")}.csv'
 			logging.info(f"Writing your data to: {my_filename}")
 			with open(my_filename, 'w') as savefile:
@@ -4871,13 +4889,21 @@ def display_results(results_list, fdisplay_dict: dict, defaultAction=None, file_
 							row += "|"
 						elif isinstance(row_data[field], str):
 							row += f"{row_data[field]:{data_format}s}|"
+						elif isinstance(row_data[field], bool):
+							if row_data[field]:
+								row += f"True|"
+							else:
+								row += f"False|"
 						elif isinstance(row_data[field], int):
 							row += f"{row_data[field]:<{data_format},}|"
 						elif isinstance(row_data[field], float):
 							row += f"{row_data[field]:{data_format}f}|"
+						elif isinstance(row_data[field], datetime):
+							row += f"{row_data[field].strftime('%c')}|"
 					row += '\n'
 					savefile.write(row)
 			print(f"\nData written to {my_filename}\n")
+			print("If your data had a sub-display for additional data, it cannot be written to file yet... ")
 
 	if isinstance(results_list, list):
 		handle_list()
