@@ -12,6 +12,7 @@ Requires-Dist: boto3
 Requires-Dist: colorama
 Requires-Dist: botocore
 Requires-Dist: tqdm
+Requires-Dist: argcomplete
 Dynamic: author
 Dynamic: author-email
 Dynamic: download-url

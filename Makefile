@@ -1,4 +1,4 @@
-.PHONY: all install uninstall run clean test unittest coverage validate test-enhanced test-enhanced-instances test-enhanced-vpcs test-enhanced-lambda test-enhanced-all test-enhanced-demo test-enhanced-validate test-enhanced-quick
+.PHONY: all install uninstall run clean test unittest coverage validate test-enhanced test-enhanced-instances test-enhanced-vpcs test-enhanced-lambda test-enhanced-all test-enhanced-demo test-enhanced-validate test-enhanced-quick install-completion
 
 # Virtual environment directory
 VENV = venv
@@ -13,6 +13,7 @@ help:
 	@echo ""
 	@echo "📦 Installation & Setup:"
 	@echo "  install              Install the package in development mode"
+	@echo "  install-completion   Install tab completion for inv_scr"
 	@echo "  uninstall            Uninstall the package"
 	@echo "  venv                 Create virtual environment"
 	@echo "  clean                Clean up generated files and cache"
@@ -67,6 +68,10 @@ $(VENV)/bin/activate: setup.py requirements.txt
 
 install:
 	pip3 install -e .
+
+install-completion: install
+	@echo "🔧 Installing tab completion for inv_scr..."
+	python3 install_completion.py
 
 uninstall:
 	pip3 uninstall inv_scr -y

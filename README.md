@@ -31,6 +31,21 @@ pip install -e .
 make install
 ```
 
+### Tab Completion (Optional)
+Enable tab completion for operations, profiles, and regions:
+```bash
+# Install completion support
+make install-completion
+
+# Or manually
+python3 install_completion.py
+```
+
+After installation, restart your shell or run `source ~/.bashrc` to enable completion. Then you can use:
+- `inv_scr <TAB>` - Complete operation names
+- `inv_scr instances --profiles <TAB>` - Complete AWS profile names
+- `inv_scr vpcs --regions <TAB>` - Complete AWS region names
+
 ## Usage
 
 ### List Available Operations

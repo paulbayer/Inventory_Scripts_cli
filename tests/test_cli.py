@@ -26,15 +26,16 @@ class TestCLI(unittest.TestCase):
     def test_operations_mapping_exists(self):
         """Test that OPERATIONS mapping contains all expected operations"""
         expected_operations = [
-            'instances', 'vpcs', 'cfnstacks', 'cfnstacksets', 'directories',
-            'ebs-volumes', 'ecs-clusters', 'elbs', 'enis', 'functions',
-            'gas', 'gd-detectors', 'orgs', 'phzs', 'policies', 'rds-instances',
-            'roles', 'saml-providers', 'subnets', 'tgws', 'topics'
+            'azs', 'cfnstacks', 'cfnstacksets', 'cloudtrail', 'config-recorders',
+            'directories', 'ebs-volumes', 'ecs-clusters', 'elbs', 'enis', 
+            'functions', 'gas', 'gd-detectors', 'instances', 'org-users', 
+            'orgs', 'phzs', 'policies', 'ram-shares', 'rds-instances',
+            'roles', 'saml-providers', 'subnets', 'tgws', 'topics', 'vpcs'
         ]
         
         for operation in expected_operations:
             self.assertIn(operation, OPERATIONS)
-            self.assertTrue(callable(OPERATIONS[operation]))
+            self.assertTrue(callable(OPERATIONS[operation]['run']))
 
     def test_version_defined(self):
         """Test that version is properly defined"""
@@ -87,7 +88,7 @@ class TestCLI(unittest.TestCase):
         self.assertIn("Available inventory operations:", output)
         self.assertIn("instances", output)
         self.assertIn("vpcs", output)
-        self.assertIn("Find EC2 instances across accounts", output)
+        self.assertIn("Find EC2 instances across AWS accounts and regions", output)
         self.assertIn("Example usage:", output)
 
     @patch('sys.stdout', new_callable=io.StringIO)
@@ -137,9 +138,10 @@ class TestCLI(unittest.TestCase):
         mock_args.Time = False
         mock_parse_args.return_value = mock_args
         
-        # Mock the operations dictionary
+        # Mock the operations dictionary structure - each operation is a dict with 'run' key
         mock_instances_run = MagicMock()
-        mock_operations.__getitem__.return_value = mock_instances_run
+        mock_operation_dict = {'run': mock_instances_run}
+        mock_operations.__getitem__.return_value = mock_operation_dict
         
         with patch('sys.stdout', new_callable=io.StringIO):
             main()
@@ -158,9 +160,10 @@ class TestCLI(unittest.TestCase):
         mock_args.Time = False
         mock_parse_args.return_value = mock_args
         
-        # Mock the operations dictionary
+        # Mock the operations dictionary structure - each operation is a dict with 'run' key
         mock_vpcs_run = MagicMock()
-        mock_operations.__getitem__.return_value = mock_vpcs_run
+        mock_operation_dict = {'run': mock_vpcs_run}
+        mock_operations.__getitem__.return_value = mock_operation_dict
         
         with patch('sys.stdout', new_callable=io.StringIO):
             main()
@@ -179,9 +182,10 @@ class TestCLI(unittest.TestCase):
         mock_args.Time = True
         mock_parse_args.return_value = mock_args
         
-        # Mock the operations dictionary
+        # Mock the operations dictionary structure - each operation is a dict with 'run' key
         mock_instances_run = MagicMock()
-        mock_operations.__getitem__.return_value = mock_instances_run
+        mock_operation_dict = {'run': mock_instances_run}
+        mock_operations.__getitem__.return_value = mock_operation_dict
         
         with patch('sys.stdout', new_callable=io.StringIO) as mock_stdout:
             main()
@@ -199,10 +203,11 @@ class TestCLI(unittest.TestCase):
         mock_args.loglevel = 50  # CRITICAL
         mock_parse_args.return_value = mock_args
         
-        # Mock the operations dictionary and make it raise KeyboardInterrupt
+        # Mock the operations dictionary structure - each operation is a dict with 'run' key
         mock_instances_run = MagicMock()
         mock_instances_run.side_effect = KeyboardInterrupt()
-        mock_operations.__getitem__.return_value = mock_instances_run
+        mock_operation_dict = {'run': mock_instances_run}
+        mock_operations.__getitem__.return_value = mock_operation_dict
         
         with patch('sys.stdout', new_callable=io.StringIO):
             with self.assertRaises(SystemExit) as cm:
@@ -220,23 +225,32 @@ class TestCLI(unittest.TestCase):
         mock_args.loglevel = 50  # CRITICAL
         mock_parse_args.return_value = mock_args
         
-        # Mock the operations dictionary and make it raise a general exception
+        # Mock the operations dictionary structure - each operation is a dict with 'run' key
         mock_instances_run = MagicMock()
         mock_instances_run.side_effect = Exception("Test error")
-        mock_operations.__getitem__.return_value = mock_instances_run
+        mock_operation_dict = {'run': mock_instances_run}
+        mock_operations.__getitem__.return_value = mock_operation_dict
         
         with patch('sys.stdout', new_callable=io.StringIO):
             with self.assertRaises(SystemExit) as cm:
                 main()
             
             self.assertEqual(cm.exception.code, 1)
+            # Verify the mock was called
+            mock_instances_run.assert_called_once()
 
     def test_all_operations_have_run_function(self):
         """Test that all operations in OPERATIONS mapping have a run function"""
-        for operation_name, operation_func in OPERATIONS.items():
-            self.assertTrue(callable(operation_func))
+        for operation_name, operation_data in OPERATIONS.items():
+            # Check that operation_data is a dictionary with required structure
+            self.assertIsInstance(operation_data, dict, f"Operation '{operation_name}' should be a dictionary")
+            self.assertIn('run', operation_data, f"Operation '{operation_name}' should have a 'run' key")
+            
+            # Check that the run function is callable
+            run_func = operation_data['run']
+            self.assertTrue(callable(run_func), f"Operation '{operation_name}' run function should be callable")
             # Check that it's actually a function (not just any callable)
-            self.assertTrue(hasattr(operation_func, '__call__'))
+            self.assertTrue(hasattr(run_func, '__call__'), f"Operation '{operation_name}' run function should have __call__ method")
 
 
 class TestCLIIntegration(unittest.TestCase):

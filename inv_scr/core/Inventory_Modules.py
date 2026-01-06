@@ -5043,7 +5043,7 @@ def get_credentials_for_accounts_in_org(faws_acct, fSkipAccounts=None, fRootOnly
 						logging.error(f"Error connecting to account {c_account_info['AccountId']} in region {c_region}.\n"
 						              f"Parent Profile was {c_profile}\n"
 						              f"Error Message: {faccount_credentials['ErrorMessage']}")
-						faccount_credentials.update({'MgmtAccount'  : c_account_info['MgmtAccount'],
+						faccount_credentials.update({'MgmtAccount'  : c_account_info.get('MgmtAccount', 'Unknown'),
 						                             'AccountId'    : c_account_info['AccountId'],
 						                             'AccountNumber': c_account_info['AccountId'],
 						                             'ParentProfile': c_profile,

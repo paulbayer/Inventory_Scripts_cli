@@ -122,12 +122,12 @@ def find_all_orgs(pProfiles: list, pSkipProfiles: list, pAccountList: list, pTim
             # AllProfileAccounts holds the list of account class objects of the accounts associated with the profiles it found.
             if item['Success'] and not item['RootAcct']:
                 account.update(item['aws_acct'].ChildAccounts[0])
-                account.update({'Profile': item['profile']})
+                account.update({'Profile': item['profile'], 'MgmtAccount': item['MgmtAccount']})
                 AccountList.append(account.copy())
             elif item['Success'] and item['RootAcct']:
                 for child_acct in item['aws_acct'].ChildAccounts:
                     account.update(child_acct)
-                    account.update({'Profile': item['profile']})
+                    account.update({'Profile': item['profile'], 'MgmtAccount': item['MgmtAccount']})
                     ProfileNameLength = max(len(item['profile']), ProfileNameLength) if item['profile'] else len("Organization's Profile")
                     AccountList.append(account.copy())
                     if not child_acct['AccountStatus'] == 'ACTIVE':

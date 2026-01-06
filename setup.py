@@ -16,6 +16,7 @@ setup(
 		"colorama",
 		"botocore",
 		"tqdm",
+		"argcomplete",
 		],
 	setup_requires=[],
 	tests_require=[

@@ -18,36 +18,120 @@ from inv_scr.operations import (
 )
 
 init()
-__version__ = "2025.07.10"
+__version__ = "2026.01.06"
 
-# Available operations mapping
+# Available operations with metadata (alphabetically sorted)
+# Ideas for later:
+#   'help_text': Detailed help beyond the description
+#   'category': Grouping operations (compute, networking, security, etc.)
+#   'requires_regions': Validation hints
+#   'supports_filtering': Capability flags
+
 OPERATIONS = {
-    'cfnstacks': cfnstacks.run,
-    'cfnstacksets': cfnstacksets.run,
-    'cloudtrail': cloudtrail.run,
-    'azs': azs.run,
-    'org-users': org_users.run,
-    'directories': directories.run,
-    'ebs-volumes': ebs_volumes.run,
-    'ecs-clusters': ecs_clusters.run,
-    'elbs': elbs.run,
-    'enis': enis.run,
-    'functions': functions.run,
-    'gas': gas.run,
-    'gd-detectors': gd_detectors.run,
-    'instances': instances.run,
-    'orgs': orgs.run,
-    'phzs': phzs.run,
-    'policies': policies.run,
-    'ram-shares': ram_shares.run,
-    'rds-instances': rds_instances.run,
-    'roles': roles.run,
-    'saml-providers': saml_providers.run,
-    'subnets': subnets.run,
-    'tgws': tgws.run,
-    'topics': topics.run,
-    'config-recorders': config_recorders.run,
-    'vpcs': vpcs.run,
+    'azs': {
+        'run': azs.run,
+        'description': 'Find availability zone coverage across AWS accounts and regions',
+    },
+    'cfnstacks': {
+        'run': cfnstacks.run,
+        'description': 'Find CloudFormation stacks across AWS accounts and regions',
+    },
+    'cfnstacksets': {
+        'run': cfnstacksets.run,
+        'description': 'Find CloudFormation stack sets across AWS Organizations',
+    },
+    'cloudtrail': {
+        'run': cloudtrail.run,
+        'description': 'Find CloudTrail coverage and configuration across accounts',
+    },
+    'config-recorders': {
+        'run': config_recorders.run,
+        'description': 'Find AWS Config recorders and delivery channels',
+    },
+    'directories': {
+        'run': directories.run,
+        'description': 'Find AWS Directory Service directories across accounts',
+    },
+    'ebs-volumes': {
+        'run': ebs_volumes.run,
+        'description': 'Find EBS volumes across AWS accounts and regions',
+    },
+    'ecs-clusters': {
+        'run': ecs_clusters.run,
+        'description': 'Find ECS clusters and running tasks across accounts',
+    },
+    'elbs': {
+        'run': elbs.run,
+        'description': 'Find Elastic Load Balancers (Classic, Application, Network) across accounts',
+    },
+    'enis': {
+        'run': enis.run,
+        'description': 'Find Elastic Network Interfaces across AWS accounts and regions',
+    },
+    'functions': {
+        'run': functions.run,
+        'description': 'Find Lambda functions across AWS accounts and regions',
+    },
+    'gas': {
+        'run': gas.run,
+        'description': 'Find Global Accelerator accelerators across AWS accounts',
+    },
+    'gd-detectors': {
+        'run': gd_detectors.run,
+        'description': 'Find GuardDuty detectors and their configuration across accounts',
+    },
+    'instances': {
+        'run': instances.run,
+        'description': 'Find EC2 instances across AWS accounts and regions',
+    },
+    'org-users': {
+        'run': org_users.run,
+        'description': 'Find IAM users and Identity Center users across AWS Organizations',
+    },
+    'orgs': {
+        'run': orgs.run,
+        'description': 'Find AWS Organizations information and account structure',
+    },
+    'phzs': {
+        'run': phzs.run,
+        'description': 'Find Route 53 Private Hosted Zones across AWS accounts',
+    },
+    'policies': {
+        'run': policies.run,
+        'description': 'Find IAM policies (managed and inline) across AWS accounts',
+    },
+    'ram-shares': {
+        'run': ram_shares.run,
+        'description': 'Find AWS Resource Access Manager (RAM) resource shares',
+    },
+    'rds-instances': {
+        'run': rds_instances.run,
+        'description': 'Find RDS database instances across AWS accounts and regions',
+    },
+    'roles': {
+        'run': roles.run,
+        'description': 'Find IAM roles across AWS accounts',
+    },
+    'saml-providers': {
+        'run': saml_providers.run,
+        'description': 'Find SAML identity providers across AWS accounts',
+    },
+    'subnets': {
+        'run': subnets.run,
+        'description': 'Find VPC subnets across AWS accounts and regions',
+    },
+    'tgws': {
+        'run': tgws.run,
+        'description': 'Find Transit Gateways and their configuration across accounts',
+    },
+    'topics': {
+        'run': topics.run,
+        'description': 'Find SNS topics across AWS accounts and regions',
+    },
+    'vpcs': {
+        'run': vpcs.run,
+        'description': 'Find VPCs across AWS accounts and regions',
+    },
 }
 
 def parse_args():
@@ -60,7 +144,13 @@ def parse_args():
         operation = sys.argv[1]
     
     parser = CommonArguments()
-    parser.my_parser.description = "AWS Inventory CLI - Find resources across AWS Organizations"
+    
+    # Customize description based on the operation
+    if operation and operation in OPERATIONS:
+        parser.my_parser.description = f"AWS Inventory CLI - {Fore.CYAN}{OPERATIONS[operation]['description']}{Fore.RESET}"
+    else:
+        parser.my_parser.description = "AWS Inventory CLI - Find resources across AWS Organizations"
+    
     parser.my_parser.add_argument(
         "operation",
         choices=list(OPERATIONS.keys()) + ['list'],
@@ -88,6 +178,14 @@ def parse_args():
         except ImportError:
             pass  # Operation module doesn't exist or doesn't have add_operation_args
     
+    # Setup tab completion
+    try:
+        import argcomplete
+        from inv_scr.completion import setup_completion
+        setup_completion(parser.my_parser)
+    except ImportError:
+        pass  # argcomplete not available
+    
     # Parse all arguments including operation-specific ones
     return parser.my_parser.parse_args()
 
@@ -96,38 +194,9 @@ def list_operations():
     print("\nAvailable inventory operations:")
     print("=" * 50)
     
-    operation_descriptions = {
-        'instances': 'Find EC2 instances across accounts',
-        'vpcs': 'Find VPCs across accounts',
-        'cfnstacks': 'Find CloudFormation stacks',
-        'cfnstacksets': 'Find CloudFormation stack sets',
-        'directories': 'Find AWS Directory Service directories',
-        'ebs-volumes': 'Find EBS volumes',
-        'ecs-clusters': 'Find ECS clusters and tasks',
-        'elbs': 'Find Elastic Load Balancers',
-        'enis': 'Find Elastic Network Interfaces',
-        'functions': 'Find Lambda functions',
-        'gas': 'Find Global Accelerator accelerators',
-        'gd-detectors': 'Find GuardDuty detectors',
-        'config-recorders': 'Find Config recorders and delivery channels',
-        'cloudtrail': 'Find CloudTrail coverage',
-        'azs': 'Find availability zone coverage',
-        'orgs': 'Find AWS Organizations information',
-        'phzs': 'Find Private Hosted Zones',
-        'policies': 'Find IAM policies',
-        'ram-shares': 'Find AWS RAM resource shares',
-        'rds-instances': 'Find RDS instances',
-        'org-users': 'Find IAM and Identity Center users',
-        'roles': 'Find IAM roles',
-        'saml-providers': 'Find SAML identity providers',
-        'subnets': 'Find VPC subnets',
-        'tgws': 'Find Transit Gateways',
-        'topics': 'Find SNS topics',
-    }
-    
     # Sort operations alphabetically for consistent display
-    for op, desc in sorted(operation_descriptions.items()):
-        print(f"  {op:<15} - {desc}")
+    for op, metadata in sorted(OPERATIONS.items()):
+        print(f"  {op:<15} - {metadata['description']}")
     
     print("\nExample usage:")
     print("  inv_scr instances --profiles my-profile --regions us-east-1")
@@ -169,7 +238,7 @@ def main():
             args._timing_context = timing
             
             # Run the selected operation
-            operation_func = OPERATIONS[args.operation]
+            operation_func = OPERATIONS[args.operation]['run']
             timing.milestone("operation_start", f"Starting {args.operation} operation")
             
             operation_func(args)

@@ -4,6 +4,7 @@ setup.py
 inv_scr/__init__.py
 inv_scr/__main__.py
 inv_scr/cli.py
+inv_scr/completion.py
 inv_scr.egg-info/PKG-INFO
 inv_scr.egg-info/SOURCES.txt
 inv_scr.egg-info/dependency_links.txt
@@ -47,7 +48,9 @@ inv_scr/operations/topics.py
 inv_scr/operations/vpcs.py
 tests/test_argument_parsing.py
 tests/test_cli.py
+tests/test_completion.py
 tests/test_core.py
 tests/test_integration.py
 tests/test_operations.py
+tests/test_region_validation.py
 tests/test_runner.py

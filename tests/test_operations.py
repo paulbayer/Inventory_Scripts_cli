@@ -1769,6 +1769,358 @@ class TestOrgsOperation(unittest.TestCase):
         self.assertTrue(hasattr(orgs, 'OrgsFound'))
         self.assertTrue(callable(orgs.OrgsFound))
 
+    def test_add_operation_args_creates_arguments(self):
+        """Test that add_operation_args properly creates argument groups and arguments"""
+        mock_parser = MagicMock()
+        mock_group = MagicMock()
+        mock_parser.my_parser.add_argument_group.return_value = mock_group
+        
+        orgs.add_operation_args(mock_parser)
+        
+        # Verify argument group was created
+        mock_parser.my_parser.add_argument_group.assert_called_once_with('orgs', 'AWS Organizations specific options')
+        
+        # Verify arguments were added (should be called 3 times for the 3 arguments)
+        self.assertEqual(mock_group.add_argument.call_count, 3)
+        
+        # Check specific argument calls
+        calls = mock_group.add_argument.call_args_list
+        
+        # First call should be for --short argument
+        self.assertIn('-s', calls[0][0])
+        self.assertIn('--short', calls[0][0])
+        
+        # Second call should be for --acct argument
+        self.assertIn('-A', calls[1][0])
+        self.assertIn('--acct', calls[1][0])
+        
+        # Third call should be for --operation-version
+        self.assertIn('--operation-version', calls[2][0])
+
+    def _create_mock_account_class(self, acct_number, account_status='ACTIVE', child_accounts=None):
+        """Helper to create mock account class objects"""
+        mock_account = MagicMock()
+        mock_account.acct_number = acct_number
+        mock_account.AccountStatus = account_status
+        mock_account.ChildAccounts = child_accounts or []
+        return mock_account
+
+    def _create_profile_account_data(self, profile, acct_number, success=True, root_acct=False, 
+                                   mgmt_account=None, org_id=None, error_msg=None, 
+                                   account_status='ACTIVE', child_accounts=None):
+        """Helper to create profile account data structure"""
+        data = {
+            'profile': profile,
+            'Success': success,
+            'RootAcct': root_acct,
+            'MgmtAccount': mgmt_account or acct_number,
+            'OrgId': org_id,
+            'aws_acct': self._create_mock_account_class(acct_number, account_status, child_accounts)
+        }
+        
+        if not success:
+            data['ErrorMessage'] = error_msg or f"Failed to access {profile}"
+            
+        return data
+
+    @patch('inv_scr.operations.orgs.get_org_accounts_from_profiles')
+    @patch('inv_scr.operations.orgs.get_profiles')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_find_all_orgs_with_failed_profiles(self, mock_stdout, mock_get_profiles, mock_get_org_accounts):
+        """Test find_all_orgs handles failed profiles correctly"""
+        # Setup mock profiles
+        mock_get_profiles.return_value = ['profile1', 'profile2', 'profile3']
+        
+        # Setup mock account data with some failures
+        mock_profile_accounts = [
+            self._create_profile_account_data('profile1', '123456789012', success=True, root_acct=True, 
+                                            mgmt_account='123456789012', org_id='o-example123'),
+            self._create_profile_account_data('profile2', '234567890123', success=False, 
+                                            error_msg="Access denied"),
+            self._create_profile_account_data('profile3', '345678901234', success=False, 
+                                            error_msg="Profile not found")
+        ]
+        
+        mock_get_org_accounts.return_value = mock_profile_accounts
+        
+        # Call function
+        result = orgs.find_all_orgs(['profile1', 'profile2', 'profile3'], [], None, False, False, None, False)
+        
+        # Verify results
+        self.assertEqual(len(result.orgs_found), 1)
+        self.assertEqual(result.orgs_found[0], '123456789012')
+        self.assertEqual(len(result.failed_profiles), 2)
+        self.assertIn('profile2', result.failed_profiles)
+        self.assertIn('profile3', result.failed_profiles)
+
+    @patch('inv_scr.operations.orgs.get_org_accounts_from_profiles')
+    @patch('inv_scr.operations.orgs.get_profiles')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_find_all_orgs_with_child_accounts(self, mock_stdout, mock_get_profiles, mock_get_org_accounts):
+        """Test find_all_orgs processes child accounts correctly"""
+        # Setup mock profiles
+        mock_get_profiles.return_value = ['org-master']
+        
+        # Create child accounts with different statuses
+        child_accounts = [
+            {'AccountId': '111111111111', 'AccountStatus': 'ACTIVE', 'AccountEmail': 'child1@example.com'},
+            {'AccountId': '222222222222', 'AccountStatus': 'SUSPENDED', 'AccountEmail': 'child2@example.com'},
+            {'AccountId': '333333333333', 'AccountStatus': 'CLOSED', 'AccountEmail': 'child3@example.com'},
+            {'AccountId': '444444444444', 'AccountStatus': 'ACTIVE', 'AccountEmail': 'child4@example.com'}
+        ]
+        
+        # Setup mock account data with child accounts
+        mock_profile_accounts = [
+            self._create_profile_account_data('org-master', '123456789012', success=True, root_acct=True,
+                                            mgmt_account='123456789012', org_id='o-example123',
+                                            child_accounts=child_accounts)
+        ]
+        
+        mock_get_org_accounts.return_value = mock_profile_accounts
+        
+        # Call function
+        result = orgs.find_all_orgs(['org-master'], [], None, False, False, None, False)
+        
+        # Verify results
+        self.assertEqual(len(result.orgs_found), 1)
+        self.assertEqual(result.orgs_found[0], '123456789012')
+        self.assertEqual(result.num_of_org_accounts, 4)  # Total child accounts
+        self.assertEqual(len(result.closed_accounts), 2)  # SUSPENDED and CLOSED accounts
+        self.assertIn('222222222222', result.closed_accounts)
+        self.assertIn('333333333333', result.closed_accounts)
+        self.assertEqual(len(result.account_list), 4)  # All child accounts in account list
+
+    @patch('inv_scr.operations.orgs.get_org_accounts_from_profiles')
+    @patch('inv_scr.operations.orgs.get_profiles')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_find_all_orgs_with_different_account_statuses(self, mock_stdout, mock_get_profiles, mock_get_org_accounts):
+        """Test find_all_orgs handles different account statuses correctly"""
+        # Setup mock profiles
+        mock_get_profiles.return_value = ['profile1', 'profile2', 'profile3']
+        
+        # Setup accounts with different statuses
+        mock_profile_accounts = [
+            self._create_profile_account_data('profile1', '123456789012', success=True, root_acct=False,
+                                            mgmt_account='999999999999', account_status='ACTIVE'),
+            self._create_profile_account_data('profile2', '234567890123', success=True, root_acct=False,
+                                            mgmt_account='999999999999', account_status='SUSPENDED'),
+            self._create_profile_account_data('profile3', '345678901234', success=True, root_acct=False,
+                                            mgmt_account='999999999999', account_status='CLOSED')
+        ]
+        
+        # Add child account data for non-root accounts
+        for profile_data in mock_profile_accounts:
+            if not profile_data['RootAcct']:
+                profile_data['aws_acct'].ChildAccounts = [{
+                    'AccountId': profile_data['aws_acct'].acct_number,
+                    'AccountStatus': profile_data['aws_acct'].AccountStatus,
+                    'AccountEmail': f"{profile_data['profile']}@example.com",
+                    'MgmtAccount': profile_data['MgmtAccount']
+                }]
+        
+        mock_get_org_accounts.return_value = mock_profile_accounts
+        
+        # Call function
+        result = orgs.find_all_orgs(['profile1', 'profile2', 'profile3'], [], None, False, False, None, False)
+        
+        # Verify results
+        self.assertEqual(len(result.account_list), 3)
+        
+        # Check that accounts with different statuses are properly tracked
+        account_statuses = [acc['AccountStatus'] for acc in result.account_list]
+        self.assertIn('ACTIVE', account_statuses)
+        self.assertIn('SUSPENDED', account_statuses)
+        self.assertIn('CLOSED', account_statuses)
+
+    @patch('inv_scr.operations.orgs.find_all_orgs')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_shortform_flag(self, mock_stdout, mock_find):
+        """Test run function with shortform flag enabled"""
+        mock_args = MockOperationHelpers.create_mock_args(pShortform=True)
+        
+        # Mock response
+        mock_response = orgs.OrgsFound()
+        mock_response.orgs_found = ['123456789012']
+        mock_response.num_of_org_accounts = 5
+        mock_response.stand_alone_accounts = []
+        mock_response.closed_accounts = []
+        mock_response.failed_profiles = []
+        mock_response.account_list = []
+        
+        mock_find.return_value = mock_response
+        
+        orgs.run(mock_args)
+        
+        # Check that shortform message is displayed
+        output = mock_stdout.getvalue()
+        self.assertIn("short form", output)
+        self.assertIn("showing only profile accounts", output)
+
+    @patch('inv_scr.operations.orgs.find_all_orgs')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_root_only_flag(self, mock_stdout, mock_find):
+        """Test run function with root only flag enabled"""
+        mock_args = MockOperationHelpers.create_mock_args(RootOnly=True)
+        
+        # Mock response
+        mock_response = orgs.OrgsFound()
+        mock_response.orgs_found = ['123456789012']
+        mock_response.num_of_org_accounts = 5
+        mock_response.stand_alone_accounts = []
+        mock_response.closed_accounts = []
+        mock_response.failed_profiles = []
+        mock_response.account_list = []
+        
+        mock_find.return_value = mock_response
+        
+        orgs.run(mock_args)
+        
+        # Check that root only message is displayed
+        output = mock_stdout.getvalue()
+        self.assertIn("root accounts only", output)
+
+    @patch('inv_scr.operations.orgs.find_all_orgs')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_account_list(self, mock_stdout, mock_find):
+        """Test run function with specific account list"""
+        mock_args = MockOperationHelpers.create_mock_args(pAccountList=['123456789012', '234567890123'])
+        
+        # Mock response with account list
+        mock_response = orgs.OrgsFound()
+        mock_response.orgs_found = ['999999999999']
+        mock_response.num_of_org_accounts = 2
+        mock_response.stand_alone_accounts = []
+        mock_response.closed_accounts = []
+        mock_response.failed_profiles = []
+        mock_response.account_list = [
+            {
+                'AccountId': '123456789012',
+                'Profile': 'profile1',
+                'MgmtAccount': '999999999999',
+                'AccountStatus': 'ACTIVE',
+                'AccountEmail': 'test1@example.com'
+            },
+            {
+                'AccountId': '234567890123',
+                'Profile': 'profile2',
+                'MgmtAccount': '999999999999',
+                'AccountStatus': 'ACTIVE',
+                'AccountEmail': 'test2@example.com'
+            }
+        ]
+        
+        mock_find.return_value = mock_response
+        
+        orgs.run(mock_args)
+        
+        # Check that account search message and results are displayed
+        output = mock_stdout.getvalue()
+        self.assertIn("Looking for specific accounts", output)
+        self.assertIn("Found the requested account number", output)
+        self.assertIn("123456789012", output)
+        self.assertIn("234567890123", output)
+
+    @patch('inv_scr.operations.orgs.find_all_orgs')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_standalone_accounts(self, mock_stdout, mock_find):
+        """Test run function displays standalone accounts correctly"""
+        mock_args = MockOperationHelpers.create_mock_args()
+        
+        # Mock response with standalone accounts
+        mock_response = orgs.OrgsFound()
+        mock_response.orgs_found = ['999999999999']
+        mock_response.num_of_org_accounts = 1
+        mock_response.stand_alone_accounts = ['111111111111', '222222222222']
+        mock_response.closed_accounts = []
+        mock_response.failed_profiles = []
+        mock_response.account_list = []
+        
+        mock_find.return_value = mock_response
+        
+        orgs.run(mock_args)
+        
+        # Check that standalone accounts are displayed
+        output = mock_stdout.getvalue()
+        self.assertIn("following accounts are Standalone", output)
+        self.assertIn("111111111111", output)
+        self.assertIn("222222222222", output)
+
+    @patch('inv_scr.operations.orgs.find_all_orgs')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_closed_accounts(self, mock_stdout, mock_find):
+        """Test run function displays closed accounts correctly"""
+        mock_args = MockOperationHelpers.create_mock_args()
+        
+        # Mock response with closed accounts
+        mock_response = orgs.OrgsFound()
+        mock_response.orgs_found = ['999999999999']
+        mock_response.num_of_org_accounts = 3
+        mock_response.stand_alone_accounts = []
+        mock_response.closed_accounts = ['333333333333', '444444444444']
+        mock_response.failed_profiles = []
+        mock_response.account_list = []
+        
+        mock_find.return_value = mock_response
+        
+        orgs.run(mock_args)
+        
+        # Check that closed accounts are displayed
+        output = mock_stdout.getvalue()
+        self.assertIn("closed or suspended", output)
+        self.assertIn("333333333333", output)
+        self.assertIn("444444444444", output)
+
+    @patch('inv_scr.operations.orgs.find_all_orgs')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_failed_profiles_display(self, mock_stdout, mock_find):
+        """Test run function displays failed profiles correctly"""
+        mock_args = MockOperationHelpers.create_mock_args()
+        
+        # Mock response with failed profiles
+        mock_response = orgs.OrgsFound()
+        mock_response.orgs_found = ['999999999999']
+        mock_response.num_of_org_accounts = 1
+        mock_response.stand_alone_accounts = []
+        mock_response.closed_accounts = []
+        mock_response.failed_profiles = ['failed-profile1', 'failed-profile2']
+        mock_response.account_list = []
+        
+        mock_find.return_value = mock_response
+        
+        orgs.run(mock_args)
+        
+        # Check that failed profiles are displayed
+        output = mock_stdout.getvalue()
+        self.assertIn("following profiles failed", output)
+        self.assertIn("failed-profile1", output)
+        self.assertIn("failed-profile2", output)
+
+    @patch('inv_scr.operations.orgs.get_org_accounts_from_profiles')
+    @patch('inv_scr.operations.orgs.get_profiles')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_find_all_orgs_shortform_mode(self, mock_stdout, mock_get_profiles, mock_get_org_accounts):
+        """Test find_all_orgs in shortform mode returns limited data"""
+        # Setup mock profiles
+        mock_get_profiles.return_value = ['profile1']
+        
+        # Setup mock account data
+        mock_profile_accounts = [
+            self._create_profile_account_data('profile1', '123456789012', success=True, root_acct=True,
+                                            mgmt_account='123456789012', org_id='o-example123')
+        ]
+        
+        mock_get_org_accounts.return_value = mock_profile_accounts
+        
+        # Call function in shortform mode
+        result = orgs.find_all_orgs(['profile1'], [], None, False, False, None, True)
+        
+        # Verify shortform results (should have limited data)
+        self.assertEqual(len(result.orgs_found), 1)
+        self.assertEqual(result.orgs_found[0], '123456789012')
+        self.assertEqual(result.num_of_org_accounts, 0)  # Not populated in shortform
+        self.assertEqual(len(result.account_list), 0)  # Not populated in shortform
+        self.assertEqual(len(result.closed_accounts), 0)  # Not populated in shortform
+
     @patch('inv_scr.operations.orgs.find_all_orgs')
     @patch('sys.stdout', new_callable=io.StringIO)
     def test_run_basic_execution(self, mock_stdout, mock_find):
@@ -1792,6 +2144,30 @@ class TestOrgsOperation(unittest.TestCase):
         # Check output contains expected text
         output = mock_stdout.getvalue()
         self.assertIn("Searching for AWS Organizations", output)
+
+    @patch('inv_scr.operations.orgs.get_org_accounts_from_profiles')
+    @patch('inv_scr.operations.orgs.get_profiles')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_find_all_orgs_with_timing_enabled(self, mock_stdout, mock_get_profiles, mock_get_org_accounts):
+        """Test find_all_orgs with timing enabled shows timing information"""
+        # Setup mock profiles
+        mock_get_profiles.return_value = ['profile1']
+        
+        # Setup mock account data
+        mock_profile_accounts = [
+            self._create_profile_account_data('profile1', '123456789012', success=True, root_acct=True,
+                                            mgmt_account='123456789012', org_id='o-example123')
+        ]
+        
+        mock_get_org_accounts.return_value = mock_profile_accounts
+        
+        # Call function with timing enabled
+        result = orgs.find_all_orgs(['profile1'], [], None, True, False, None, False)
+        
+        # Check that timing output is present
+        output = mock_stdout.getvalue()
+        self.assertIn("taken", output)
+        self.assertIn("seconds", output)
 
 
 class TestRdsInstancesOperation(unittest.TestCase):
@@ -2171,6 +2547,267 @@ class TestRamSharesOperation(unittest.TestCase):
         self.assertEqual(display_args[0]['ShareName'], 'test-share')
         self.assertEqual(display_args[0]['ShareType'], 'OWNED')
         self.assertEqual(display_args[0]['Region'], 'us-east-1')
+
+    def test_add_operation_args(self):
+        """Test argument parser setup for ram_shares operation"""
+        # Create a mock parser
+        mock_parser = MagicMock()
+        mock_group = MagicMock()
+        mock_parser.my_parser.add_argument_group.return_value = mock_group
+        
+        # Test the argument setup
+        ram_shares.add_operation_args(mock_parser)
+        
+        # Verify argument group was created
+        mock_parser.my_parser.add_argument_group.assert_called_once_with('ram-shares', 'AWS RAM shares options')
+        
+        # Verify arguments were added (3 arguments: status, type, and version)
+        self.assertEqual(mock_group.add_argument.call_count, 3)
+
+    @patch('inv_scr.operations.ram_shares.boto3.Session')
+    @patch('inv_scr.operations.ram_shares.logging')
+    def test_get_ram_shares_for_account_client_error(self, mock_logging, mock_session):
+        """Test error handling in _get_ram_shares_for_account when AWS API fails"""
+        from botocore.exceptions import ClientError
+        
+        # Setup mock credentials
+        mock_credentials = {
+            'AccessKeyId': 'test-key',
+            'SecretAccessKey': 'test-secret',
+            'SessionToken': 'test-token',
+            'Region': 'us-east-1',
+            'AccountId': '123456789012'
+        }
+        
+        # Setup mock client that raises ClientError
+        mock_client = MagicMock()
+        mock_session.return_value.client.return_value = mock_client
+        
+        # Mock paginator that returns shares
+        mock_paginator = MagicMock()
+        mock_client.get_paginator.return_value = mock_paginator
+        mock_paginator.paginate.return_value = [
+            {
+                'resourceShares': [
+                    {
+                        'resourceShareArn': 'arn:aws:ram:us-east-1:123456789012:resource-share/test',
+                        'name': 'test-share',
+                        'status': 'ACTIVE',
+                        'owningAccountId': '123456789012',
+                        'creationTime': '2024-01-01T00:00:00Z',
+                        'lastUpdatedTime': '2024-01-02T00:00:00Z',
+                        'allowExternalPrincipals': False,
+                        'tags': []
+                    }
+                ]
+            }
+        ]
+        
+        # Make get_resource_share_associations raise ClientError
+        error_response = {'Error': {'Code': 'AccessDenied', 'Message': 'Access denied'}}
+        mock_client.get_resource_share_associations.side_effect = ClientError(error_response, 'GetResourceShareAssociations')
+        
+        # Call the function with specific type to get only one share type
+        result = ram_shares._get_ram_shares_for_account(mock_credentials, None, 'OWNED')
+        
+        # Verify error was logged and function still returns results
+        mock_logging.debug.assert_called()
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)  # Should still return the share even with API errors
+
+    @patch('inv_scr.operations.ram_shares.boto3.Session')
+    def test_get_ram_shares_for_account_with_filters(self, mock_session):
+        """Test _get_ram_shares_for_account with status and type filters"""
+        # Setup mock credentials
+        mock_credentials = {
+            'AccessKeyId': 'test-key',
+            'SecretAccessKey': 'test-secret',
+            'SessionToken': 'test-token',
+            'Region': 'us-east-1',
+            'AccountId': '123456789012'
+        }
+        
+        # Setup mock client
+        mock_client = MagicMock()
+        mock_session.return_value.client.return_value = mock_client
+        
+        # Mock paginator with shares of different statuses
+        mock_paginator = MagicMock()
+        mock_client.get_paginator.return_value = mock_paginator
+        mock_paginator.paginate.return_value = [
+            {
+                'resourceShares': [
+                    {
+                        'resourceShareArn': 'arn:aws:ram:us-east-1:123456789012:resource-share/active',
+                        'name': 'active-share',
+                        'status': 'ACTIVE',
+                        'owningAccountId': '123456789012',
+                        'creationTime': '2024-01-01T00:00:00Z',
+                        'lastUpdatedTime': '2024-01-02T00:00:00Z',
+                        'allowExternalPrincipals': False,
+                        'tags': []
+                    },
+                    {
+                        'resourceShareArn': 'arn:aws:ram:us-east-1:123456789012:resource-share/pending',
+                        'name': 'pending-share',
+                        'status': 'PENDING',
+                        'owningAccountId': '123456789012',
+                        'creationTime': '2024-01-01T00:00:00Z',
+                        'lastUpdatedTime': '2024-01-02T00:00:00Z',
+                        'allowExternalPrincipals': False,
+                        'tags': []
+                    }
+                ]
+            }
+        ]
+        
+        # Mock successful API responses
+        mock_client.get_resource_share_associations.return_value = {
+            'resourceShareAssociations': []
+        }
+        
+        # Test with status filter - should only return ACTIVE shares
+        result = ram_shares._get_ram_shares_for_account(mock_credentials, 'ACTIVE', 'OWNED')
+        
+        # Should only get the ACTIVE share
+        active_shares = [share for share in result if share['Status'] == 'ACTIVE']
+        pending_shares = [share for share in result if share['Status'] == 'PENDING']
+        
+        self.assertGreater(len(active_shares), 0)
+        self.assertEqual(len(pending_shares), 0)
+
+    @patch('inv_scr.operations.ram_shares._get_ram_shares_for_account')
+    @patch('inv_scr.operations.ram_shares.tqdm')
+    @patch('inv_scr.operations.ram_shares.logging')
+    def test_find_all_ram_shares_with_client_error(self, mock_logging, mock_tqdm, mock_get_shares):
+        """Test error handling in _find_all_ram_shares when individual account processing fails"""
+        from botocore.exceptions import ClientError
+        
+        # Setup mock credentials
+        mock_credentials = [
+            {
+                'AccessKeyId': 'test-key',
+                'SecretAccessKey': 'test-secret',
+                'SessionToken': 'test-token',
+                'Region': 'us-east-1',
+                'AccountId': '123456789012',
+                'ParentProfile': 'test-profile',
+                'MgmtAccount': '123456789012'
+            }
+        ]
+        
+        # Setup mock progress bar
+        mock_pbar = MagicMock()
+        mock_tqdm.return_value = mock_pbar
+        
+        # Make _get_ram_shares_for_account raise ClientError
+        error_response = {'Error': {'Code': 'AccessDenied', 'Message': 'Access denied'}}
+        mock_get_shares.side_effect = ClientError(error_response, 'GetResourceShares')
+        
+        # Call the function
+        result = ram_shares._find_all_ram_shares(mock_credentials, None, None)
+        
+        # Verify error was logged and function returns empty list
+        mock_logging.error.assert_called()
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 0)
+        
+        # Verify progress bar was updated
+        mock_pbar.update.assert_called()
+
+    @patch('inv_scr.operations.ram_shares._get_ram_shares_for_account')
+    @patch('inv_scr.operations.ram_shares.tqdm')
+    def test_find_all_ram_shares_threading(self, mock_tqdm, mock_get_shares):
+        """Test threading behavior in _find_all_ram_shares"""
+        # Setup mock credentials for multiple accounts
+        mock_credentials = []
+        for i in range(5):
+            mock_credentials.append({
+                'AccessKeyId': f'test-key-{i}',
+                'SecretAccessKey': f'test-secret-{i}',
+                'SessionToken': f'test-token-{i}',
+                'Region': 'us-east-1',
+                'AccountId': f'12345678901{i}',
+                'ParentProfile': 'test-profile',
+                'MgmtAccount': f'12345678901{i}'
+            })
+        
+        # Setup mock progress bar
+        mock_pbar = MagicMock()
+        mock_tqdm.return_value = mock_pbar
+        
+        # Mock successful share retrieval
+        mock_get_shares.return_value = [
+            {
+                'ShareType': 'OWNED',
+                'ShareArn': 'arn:aws:ram:us-east-1:123456789012:resource-share/test',
+                'ShareName': 'test-share',
+                'Status': 'ACTIVE',
+                'OwningAccountId': '123456789012',
+                'CreationTime': '2024-01-01T00:00:00Z',
+                'LastUpdatedTime': '2024-01-02T00:00:00Z',
+                'AllowExternalPrincipals': False,
+                'Tags': [],
+                'Resources': [],
+                'SharedWith': []
+            }
+        ]
+        
+        # Call the function
+        result = ram_shares._find_all_ram_shares(mock_credentials, None, None)
+        
+        # Verify all credentials were processed
+        self.assertEqual(mock_get_shares.call_count, 5)
+        self.assertIsInstance(result, list)
+        
+        # Verify progress bar was updated for each credential
+        self.assertEqual(mock_pbar.update.call_count, 5)
+
+    @patch('inv_scr.operations.ram_shares.get_all_credentials')
+    @patch('inv_scr.operations.ram_shares._find_all_ram_shares')
+    @patch('inv_scr.operations.ram_shares.display_results')
+    def test_run_with_filters(self, mock_display, mock_find_ram, mock_get_creds):
+        """Test run function with status and type filters"""
+        mock_credentials = MockCredentialFixtures.get_scenario_credentials('simple')
+        mock_get_creds.return_value = mock_credentials
+        mock_find_ram.return_value = []
+        
+        # Create mock args with filters
+        mock_args = MockOperationHelpers.create_mock_args(pStatus='ACTIVE', pType='OWNED')
+        
+        with patch('inv_scr.operations.ram_shares.tqdm'):
+            ram_shares.run(mock_args)
+        
+        # Verify _find_all_ram_shares was called with the correct filters
+        mock_find_ram.assert_called_once_with(mock_credentials, 'ACTIVE', 'OWNED')
+
+    @patch('inv_scr.operations.ram_shares.get_all_credentials')
+    @patch('inv_scr.operations.ram_shares._find_all_ram_shares')
+    @patch('inv_scr.operations.ram_shares.display_results')
+    def test_run_with_timing_context(self, mock_display, mock_find_ram, mock_get_creds):
+        """Test run function with timing context"""
+        mock_credentials = MockCredentialFixtures.get_scenario_credentials('simple')
+        mock_get_creds.return_value = mock_credentials
+        mock_find_ram.return_value = []
+        
+        # Create mock args with timing context
+        mock_timing = MagicMock()
+        mock_args = MockOperationHelpers.create_mock_args()
+        mock_args._timing_context = mock_timing
+        
+        with patch('inv_scr.operations.ram_shares.tqdm'):
+            ram_shares.run(mock_args)
+        
+        # Verify timing milestones were called
+        expected_calls = [
+            call("args_parsed", "Arguments parsed and validated"),
+            call("credentials_setup", unittest.mock.ANY),
+            call("ram_shares_found", unittest.mock.ANY),
+            call("results_displayed", "RAM shares results formatted and displayed")
+        ]
+        
+        for expected_call in expected_calls:
+            self.assertIn(expected_call, mock_timing.milestone.call_args_list)
 
 
 class TestConfigRecordersOperation(unittest.TestCase):

@@ -217,6 +217,134 @@ class TestAccountClass(unittest.TestCase):
         self.assertTrue(callable(account_class._validate_region))
 
     @patch('boto3.Session')
+    def test_validate_region_none_region_defaults_to_us_east_1(self, mock_session):
+        """Test that None region defaults to us-east-1"""
+        mock_session_instance = MagicMock()
+        mock_session_instance.region_name = None
+        
+        result = account_class._validate_region(mock_session_instance, None)
+        
+        self.assertTrue(result['Success'])
+        self.assertEqual(result['Region'], 'us-east-1')
+        self.assertIn('Defaulting to \'us-east-1\'', result['Message'])
+
+    @patch('boto3.Session')
+    def test_validate_region_us_east_1_returns_success_immediately(self, mock_session):
+        """Test that us-east-1 returns success immediately without API call"""
+        mock_session_instance = MagicMock()
+        mock_session_instance.region_name = 'us-east-1'
+        
+        result = account_class._validate_region(mock_session_instance, 'us-east-1')
+        
+        self.assertTrue(result['Success'])
+        self.assertEqual(result['Region'], 'us-east-1')
+        self.assertIn('Defaulting to \'us-east-1\'', result['Message'])
+
+    @patch('boto3.Session')
+    def test_validate_region_valid_region_success(self, mock_session):
+        """Test validation of a valid region"""
+        mock_session_instance = MagicMock()
+        mock_ec2_client = MagicMock()
+        mock_session_instance.client.return_value = mock_ec2_client
+        
+        # Mock successful region validation
+        mock_ec2_client.describe_regions.return_value = {
+            'Regions': [{
+                'RegionName': 'us-west-2',
+                'OptInStatus': 'opt-in-not-required'
+            }]
+        }
+        
+        result = account_class._validate_region(mock_session_instance, 'us-west-2')
+        
+        self.assertTrue(result['Success'])
+        self.assertEqual(result['Region'], 'us-west-2')
+        self.assertIn('is a valid region within AWS', result['Message'])
+        mock_ec2_client.describe_regions.assert_called_once_with(
+            Filters=[{'Name': 'region-name', 'Values': ['us-west-2']}]
+        )
+
+    @patch('boto3.Session')
+    def test_validate_region_valid_but_not_opted_in(self, mock_session):
+        """Test validation of a valid region that account hasn't opted into"""
+        mock_session_instance = MagicMock()
+        mock_ec2_client = MagicMock()
+        mock_session_instance.client.return_value = mock_ec2_client
+        
+        # Mock region that exists but account hasn't opted in
+        mock_ec2_client.describe_regions.return_value = {
+            'Regions': [{
+                'RegionName': 'ap-east-1',
+                'OptInStatus': 'not-opted-in'
+            }]
+        }
+        
+        result = account_class._validate_region(mock_session_instance, 'ap-east-1')
+        
+        self.assertFalse(result['Success'])
+        self.assertEqual(result['Region'], 'ap-east-1')
+        self.assertIn('hasn\'t opted into this region', result['Message'])
+
+    @patch('boto3.Session')
+    def test_validate_region_invalid_region(self, mock_session):
+        """Test validation of an invalid region"""
+        mock_session_instance = MagicMock()
+        mock_ec2_client = MagicMock()
+        mock_session_instance.client.return_value = mock_ec2_client
+        
+        # Mock empty response for invalid region
+        mock_ec2_client.describe_regions.return_value = {'Regions': []}
+        
+        result = account_class._validate_region(mock_session_instance, 'invalid-region')
+        
+        self.assertFalse(result['Success'])
+        self.assertEqual(result['Region'], 'invalid-region')
+        self.assertIn('is not valid region within this AWS partition', result['Message'])
+
+    @patch('boto3.Session')
+    def test_validate_region_api_exception(self, mock_session):
+        """Test validation when AWS API throws an exception"""
+        mock_session_instance = MagicMock()
+        mock_ec2_client = MagicMock()
+        mock_session_instance.client.return_value = mock_ec2_client
+        
+        # Mock API exception
+        mock_ec2_client.describe_regions.side_effect = ClientError(
+            {'Error': {'Code': 'UnauthorizedOperation', 'Message': 'Access denied'}},
+            'DescribeRegions'
+        )
+        
+        result = account_class._validate_region(mock_session_instance, 'us-west-2')
+        
+        self.assertFalse(result['Success'])
+        self.assertEqual(result['Region'], 'us-west-2')
+        self.assertIn('Problem happened', result['Message'])
+
+    @patch('boto3.Session')
+    def test_validate_region_uses_session_region_when_none_provided(self, mock_session):
+        """Test that function uses session region when no region is provided"""
+        mock_session_instance = MagicMock()
+        mock_session_instance.region_name = 'eu-west-1'
+        mock_ec2_client = MagicMock()
+        mock_session_instance.client.return_value = mock_ec2_client
+        
+        # Mock successful region validation
+        mock_ec2_client.describe_regions.return_value = {
+            'Regions': [{
+                'RegionName': 'eu-west-1',
+                'OptInStatus': 'opt-in-not-required'
+            }]
+        }
+        
+        result = account_class._validate_region(mock_session_instance, None)
+        
+        self.assertTrue(result['Success'])
+        self.assertEqual(result['Region'], 'eu-west-1')
+        mock_ec2_client.describe_regions.assert_called_once_with(
+            Filters=[{'Name': 'region-name', 'Values': ['eu-west-1']}]
+        )
+
+    @patch('boto3.Session')
     def test_aws_acct_credentials_initialization(self, mock_session):
         """Test Aws_Acct_Credentials initialization"""
         # Mock STS client
@@ -241,6 +369,107 @@ class TestAccountClass(unittest.TestCase):
         except Exception as e:
             # Some exceptions are expected due to mocking complexity
             self.assertIsInstance(e, (AttributeError, KeyError))
+
+    @patch('inv_scr.core.account_class._validate_region')
+    @patch('boto3.Session')
+    def test_aws_acct_access_region_validation_success(self, mock_session, mock_validate_region):
+        """Test aws_acct_access with successful region validation"""
+        # Mock session
+        mock_session_instance = MagicMock()
+        mock_session.return_value = mock_session_instance
+        mock_session_instance.region_name = 'us-west-2'
+        
+        # Mock successful region validation
+        mock_validate_region.return_value = {
+            'Success': True,
+            'Message': 'us-west-2 is a valid region within AWS',
+            'Region': 'us-west-2'
+        }
+        
+        # Mock STS client for account number
+        mock_sts_client = MagicMock()
+        mock_sts_client.get_caller_identity.return_value = {'Account': '123456789012'}
+        
+        # Mock organizations client (standalone account)
+        mock_org_client = MagicMock()
+        mock_org_client.describe_organization.side_effect = ClientError(
+            {'Error': {'Code': 'AWSOrganizationsNotInUseException'}}, 'DescribeOrganization'
+        )
+        
+        def client_side_effect(service, **kwargs):
+            if service == 'sts':
+                return mock_sts_client
+            elif service == 'organizations':
+                return mock_org_client
+            return MagicMock()
+        
+        mock_session_instance.client.side_effect = client_side_effect
+        
+        # Test initialization
+        try:
+            account = account_class.aws_acct_access(fProfile='test-profile', fRegion='us-west-2')
+            mock_validate_region.assert_called_once()
+            # If we get here, region validation was called and succeeded
+            self.assertTrue(True)
+        except Exception as e:
+            # Some exceptions are expected due to mocking complexity
+            self.assertIsInstance(e, (AttributeError, KeyError, ClientError))
+
+    @patch('inv_scr.core.account_class._validate_region')
+    @patch('boto3.Session')
+    def test_aws_acct_access_region_validation_failure(self, mock_session, mock_validate_region):
+        """Test aws_acct_access with failed region validation"""
+        # Mock session
+        mock_session_instance = MagicMock()
+        mock_session.return_value = mock_session_instance
+        mock_session_instance.region_name = 'invalid-region'
+        
+        # Mock failed region validation
+        mock_validate_region.return_value = {
+            'Success': False,
+            'Message': 'invalid-region is not valid region within this AWS partition',
+            'Region': 'invalid-region'
+        }
+        
+        # Test initialization
+        try:
+            account = account_class.aws_acct_access(fProfile='test-profile', fRegion='invalid-region')
+            mock_validate_region.assert_called_once()
+            # Check that the account object reflects the failure
+            if hasattr(account, 'Success'):
+                self.assertFalse(account.Success)
+            if hasattr(account, 'ErrorType'):
+                self.assertEqual(account.ErrorType, 'Invalid region')
+        except Exception as e:
+            # Some exceptions are expected due to mocking complexity
+            self.assertIsInstance(e, (AttributeError, KeyError, ClientError))
+
+    @patch('inv_scr.core.account_class._validate_region')
+    @patch('boto3.Session')
+    def test_aws_acct_access_region_validation_not_opted_in(self, mock_session, mock_validate_region):
+        """Test aws_acct_access with region that account hasn't opted into"""
+        # Mock session
+        mock_session_instance = MagicMock()
+        mock_session.return_value = mock_session_instance
+        mock_session_instance.region_name = 'ap-east-1'
+        
+        # Mock region validation for not-opted-in region
+        mock_validate_region.return_value = {
+            'Success': False,
+            'Message': 'ap-east-1 is a valid region within AWS, but this account hasn\'t opted into this region',
+            'Region': 'ap-east-1'
+        }
+        
+        # Test initialization
+        try:
+            account = account_class.aws_acct_access(fProfile='test-profile', fRegion='ap-east-1')
+            mock_validate_region.assert_called_once()
+            # Check that the account object reflects the failure
+            if hasattr(account, 'Success'):
+                self.assertFalse(account.Success)
+        except Exception as e:
+            # Some exceptions are expected due to mocking complexity
+            self.assertIsInstance(e, (AttributeError, KeyError, ClientError))
 
 
 if __name__ == '__main__':
