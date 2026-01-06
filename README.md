@@ -85,8 +85,11 @@ inv_scr vpcs --profiles my-profile --filename vpc-inventory.txt
 
 | Operation | Description |
 |-----------|-------------|
+| `azs` | Find availability zone coverage across AWS accounts and regions |
 | `cfnstacks` | Find CloudFormation stacks |
 | `cfnstacksets` | Find CloudFormation stack sets |
+| `cloudtrail` | Find CloudTrail coverage and configuration across accounts |
+| `config-recorders` | Find AWS Config recorders and delivery channels | 
 | `directories` | Find AWS Directory Service directories |
 | `ebs-volumes` | Find EBS volumes |
 | `ecs-clusters` | Find ECS clusters and tasks |
@@ -96,9 +99,11 @@ inv_scr vpcs --profiles my-profile --filename vpc-inventory.txt
 | `gas` | Find Global Accelerator accelerators |
 | `gd-detectors` | Find GuardDuty detectors |
 | `instances` | Find EC2 instances across accounts |
+| `org-users` | Find IAM users and Identity Center users across AWS Organizations |
 | `orgs` | Find AWS Organizations information |
 | `phzs` | Find Private Hosted Zones |
 | `policies` | Find IAM policies |
+| `ram-shares` | Find AWS Resource Access Manager (RAM) resource shares | 
 | `rds-instances` | Find RDS instances |
 | `roles` | Find IAM roles |
 | `saml-providers` | Find SAML identity providers |
