@@ -13,7 +13,7 @@ from typing import Dict, List, Set, Tuple
 
 def get_functions_list() -> List[str]:
     """Get list of all functional scripts"""
-    functions_dir = Path("inv_scr/functions")
+    functions_dir = Path("legacy_operations")
     if not functions_dir.exists():
         return []
     

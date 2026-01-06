@@ -1,0 +1,1 @@
+/Users/paulbaye/GitRepos/Inventory_Scripts/check_all_cloudtrail.py

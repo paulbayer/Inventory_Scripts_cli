@@ -1,0 +1,1 @@
+/Users/paulbaye/GitRepos/Inventory_Scripts/update_retention_on_all_my_cw_groups.py

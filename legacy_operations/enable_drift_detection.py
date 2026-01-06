@@ -1,0 +1,1 @@
+/Users/paulbaye/GitRepos/Inventory_Scripts/enable_drift_detection.py

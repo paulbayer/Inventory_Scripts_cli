@@ -1,0 +1,1 @@
+/Users/paulbaye/GitRepos/Inventory_Scripts/last_stackset_operations.py

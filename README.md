@@ -173,7 +173,7 @@ inv_scr/
 │   ├── instances.py
 │   ├── vpcs.py
 │   └── ...
-└── functions/          # Legacy individual scripts (deprecated)
+legacy_operations/      # Legacy individual scripts (deprecated)
 ```
 
 ## Troubleshooting

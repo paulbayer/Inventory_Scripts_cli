@@ -1,0 +1,1 @@
+/Users/paulbaye/GitRepos/Inventory_Scripts/my_ssm_parameters.py

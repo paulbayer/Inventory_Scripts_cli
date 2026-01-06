@@ -1,0 +1,1 @@
+/Users/paulbaye/GitRepos/Inventory_Scripts/put_s3_public_block.py

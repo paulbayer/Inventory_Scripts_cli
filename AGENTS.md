@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 - CLI entrypoint in `inv_scr/cli.py` with operations mapped in `OPERATIONS`.
-- Shared helpers in `inv_scr/core/`; per-resource logic in `inv_scr/operations/` (each exposes `add_operation_args` + `run`); legacy reference scripts in `inv_scr/functions/`.
+- Shared helpers in `inv_scr/core/`; per-resource logic in `inv_scr/operations/` (each exposes `add_operation_args` + `run`); legacy reference scripts in `legacy_operations/`.
 - Tests live in `tests/` (`test_cli.py`, `test_operations.py`, `test_core.py`, `test_integration.py`, `test_argument_parsing.py`); demo data and coverage artifacts in `demo_shared_test_data.py` and `htmlcov/`.
 - Build/test helpers at repo root: `Makefile`, `requirements.txt`, `validate_tests.py`, `run_enhanced_tests.py`, and testing docs.
 

@@ -1,0 +1,1 @@
+/Users/paulbaye/GitRepos/Inventory_Scripts/SC_Products_to_CFN_Stacks.py

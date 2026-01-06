@@ -1,0 +1,1 @@
+/Users/paulbaye/GitRepos/Inventory_Scripts/all_my_gd-detectors.py

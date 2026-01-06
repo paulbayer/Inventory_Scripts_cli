@@ -1,0 +1,1 @@
+/Users/paulbaye/GitRepos/Inventory_Scripts/find_orphaned_stacks.py

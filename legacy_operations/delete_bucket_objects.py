@@ -1,0 +1,1 @@
+/Users/paulbaye/GitRepos/Inventory_Scripts/delete_bucket_objects.py

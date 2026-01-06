@@ -1,0 +1,1 @@
+/Users/paulbaye/GitRepos/Inventory_Scripts/mod_my_cfnstacksets.py
