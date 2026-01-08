@@ -21,6 +21,7 @@ just in case...
 """
 
 
+# NOT IN USE: No current operations use this function
 def get_regions3(faws_acct, fregion_list=None):
 	"""
 	This is a library function to get the AWS region names that correspond to the
@@ -65,6 +66,7 @@ def get_regions3(faws_acct, fregion_list=None):
 		return RegionNames2
 
 
+# NOT IN USE: No current operations use this function
 def get_ec2_regions3(faws_acct, fkey=None):
 	"""
 	This is a library function to get the AWS region names that correspond to the
@@ -112,6 +114,7 @@ def get_ec2_regions3(faws_acct, fkey=None):
 	return RegionNames2
 
 
+# NOT IN USE: No current operations use this function
 def get_service_regions(service, fkey=None, fprofile=None, ocredentials=None, faws_acct=None):
 	"""
 	Parameters:
@@ -149,6 +152,7 @@ def get_service_regions(service, fkey=None, fprofile=None, ocredentials=None, fa
 	return RegionNames
 
 
+# NOT IN USE: No current operations use this function
 def validate_region3(faws_acct, fRegion=None):
 	import logging
 
@@ -170,6 +174,7 @@ def validate_region3(faws_acct, fRegion=None):
 		return result
 
 
+# IN USE: Used by orgs operation
 def get_profiles(fSkipProfiles=None, fprofiles=None):
 	"""
 	We assume that the user of this function wants all profiles.
@@ -216,6 +221,7 @@ def get_profiles(fSkipProfiles=None, fprofiles=None):
 	return ProfileList
 
 
+# IN USE: Used by roles operation
 def find_in(list_to_search, list_to_find=None, fexact=False):
 	import logging
 
@@ -238,6 +244,7 @@ def find_in(list_to_search, list_to_find=None, fexact=False):
 	return list_to_return
 
 
+# NOT IN USE: No current operations use this function
 def addLoggingLevel(levelName, levelNum, methodName=None):
 	import logging
 	"""
@@ -290,6 +297,7 @@ def addLoggingLevel(levelName, levelNum, methodName=None):
 	setattr(logging, methodName, logToRoot)
 
 
+# NOT IN USE: No current operations use this function
 def find_if_alz(fProfile: str) -> dict:
 	import boto3
 
@@ -307,6 +315,7 @@ def find_if_alz(fProfile: str) -> dict:
 	return response
 
 
+# NOT IN USE: No current operations use this function
 def find_bucket_location(fProfile, fBucketname):
 	import boto3
 	import logging
@@ -327,6 +336,7 @@ def find_bucket_location(fProfile, fBucketname):
 	return location
 
 
+# NOT IN USE: No current operations use this function
 def find_acct_email(fOrgRootProfile, fAccountId):
 	import boto3
 	"""
@@ -340,6 +350,7 @@ def find_acct_email(fOrgRootProfile, fAccountId):
 	return email_addr
 
 
+# NOT IN USE: No current operations use this function
 def find_account_number(fProfile=None):
 	import boto3
 	import logging
@@ -376,6 +387,7 @@ def find_account_number(fProfile=None):
 	return response
 
 
+# NOT IN USE: No current operations use this function
 def find_calling_identity(fProfile):
 	import boto3
 	import logging
@@ -400,6 +412,7 @@ def find_calling_identity(fProfile):
 	return creds
 
 
+# NOT IN USE: No current operations use this function
 def RemoveCoreAccounts(MainList, AccountsToRemove=None):
 	import logging
 	"""
@@ -426,6 +439,7 @@ def RemoveCoreAccounts(MainList, AccountsToRemove=None):
 	return NewCA
 
 
+# NOT IN USE: No current operations use this function
 def print_timings(fTiming: bool = False, fverbose: int = 50, fbegin_time=None, fmessage: str = None):
 	"""
 	Description: Prints how long it's taken in the script to get to this point...
@@ -444,6 +458,7 @@ def print_timings(fTiming: bool = False, fverbose: int = 50, fbegin_time=None, f
 		      f"This script has taken {time() - fbegin_time:.6f} seconds so far{Fore.RESET}")
 
 
+# NOT IN USE: No current operations use this function
 def make_creds(faws_acct):
 	return ({'AccessKeyId'    : faws_acct.creds.access_key,
 	         'SecretAccessKey': faws_acct.creds.secret_key,
@@ -455,6 +470,7 @@ def make_creds(faws_acct):
 	         'MgmtAccount'    : faws_acct.MgmtAccount})
 
 
+# NOT IN USE: No current operations use this function
 def get_child_access(fRootProfile, fChildAccount, fRegion='us-east-1', fRoleList=None):
 	"""
 	@param: fRootProfile is a string
@@ -524,6 +540,7 @@ def get_child_access(fRootProfile, fChildAccount, fRegion='us-east-1', fRoleList
 	return account_credentials, return_string
 
 
+# NOT IN USE: No current operations use this function
 def get_child_access3(faws_acct, fChildAccount: str, fRegion: str = None, fRoleList: list = None):
 	"""
 	- faws_acct is a custom class (account_class.aws_acct_access)
@@ -651,6 +668,7 @@ def get_child_access3(faws_acct, fChildAccount: str, fRegion: str = None, fRoleL
 	return account_credentials
 
 
+# NOT IN USE: No current operations use this function
 def enable_drift_on_stacks2(ocredentials: dict, fRegion: str, fStackName: str):
 	import boto3
 	import logging
@@ -664,6 +682,7 @@ def enable_drift_on_stacks2(ocredentials: dict, fRegion: str, fStackName: str):
 	return response  # Since this is an async process, there is no response to send back
 
 
+# NOT IN USE: No current operations use this function
 def enable_drift_on_stackset2(ocredentials: dict, fStackSetName: str):
 	"""
 	@param: ocredentials - dict object containing account information
@@ -686,6 +705,7 @@ def enable_drift_on_stackset2(ocredentials: dict, fStackSetName: str):
 	return response  # Since this is an async process, there is no response to send back
 
 
+# NOT IN USE: No current operations use this function
 def enable_drift_on_stackset3(faws_acct, fStackSetName: str):
 	"""
 	@param: ocredentials - dict object containing account information
@@ -725,6 +745,7 @@ Below - Specific functions to specific features
 """
 
 
+# IN USE: Used by topics operation
 def find_sns_topics2(ocredentials, fTopicFrag: str = None, fExact: bool = False):
 	"""
 	ocredentials is an object with the following structure:
@@ -776,6 +797,7 @@ def find_sns_topics2(ocredentials, fTopicFrag: str = None, fExact: bool = False)
 		return topic_list2
 
 
+# NOT IN USE: No current operations use this function
 def find_role_names2(ocredentials, fRegion, fRoleNameFrag=None):
 	"""
 	ocredentials is an object with the following structure:
@@ -820,6 +842,7 @@ def find_role_names2(ocredentials, fRegion, fRoleNameFrag=None):
 		return RoleNameList2
 
 
+# NOT IN USE: No current operations use this function
 def find_cw_log_group_names2(ocredentials, fRegion, fCWLogGroupFrag=None):
 	"""
 	ocredentials is an object with the following structure:
@@ -869,6 +892,7 @@ def find_cw_log_group_names2(ocredentials, fRegion, fCWLogGroupFrag=None):
 		return CWLogGroupList2
 
 
+# NOT IN USE: No current operations use this function
 def find_org_services2(ocredentials, serviceNameList=None):
 	"""
 	ocredentials is an object with the following structure:
@@ -919,6 +943,7 @@ def find_org_services2(ocredentials, serviceNameList=None):
 		return EnabledOrgServicesList2
 
 
+# NOT IN USE: No current operations use this function
 def disable_org_service2(ocredentials, serviceName=None):
 	"""
 	ocredentials is an object with the following structure:
@@ -960,6 +985,7 @@ def disable_org_service2(ocredentials, serviceName=None):
 	return returnResponse
 
 
+# NOT IN USE: No current operations use this function
 def find_security_groups2(ocredentials, f_fragments: list = None, f_exact: bool = False, defaultOnly: bool = False) -> list:
 	"""
 	ocredentials is an object with the following structure:
@@ -1000,6 +1026,7 @@ def find_security_groups2(ocredentials, f_fragments: list = None, f_exact: bool 
 	return AllSecurityGroups
 
 
+# NOT IN USE: No current operations use this function
 def find_references_to_security_groups2(ocredentials, f_security_group: dict):
 	"""
 	Description: An effort to find all resources that might be referencing this security group
@@ -1138,6 +1165,7 @@ def find_references_to_security_groups2(ocredentials, f_security_group: dict):
 	return SecurityGroupReferences
 
 
+# IN USE: Used by vpcs and tgws operations
 def find_account_vpcs2(ocredentials, defaultOnly=False):
 	"""
 	ocredentials is an object with the following structure:
@@ -1176,6 +1204,7 @@ def find_account_vpcs2(ocredentials, defaultOnly=False):
 	return response
 
 
+# NOT IN USE: No current operations use this function
 def find_account_vpcs3(faws_acct, fRegion, defaultOnly=False):
 	"""
 	faws_acct uses the account_class object
@@ -1196,6 +1225,7 @@ def find_account_vpcs3(faws_acct, fRegion, defaultOnly=False):
 	return response
 
 
+# IN USE: Used by config_recorders operation
 def find_config_recorders2(ocredentials, fRegion):
 	"""
 	ocredentials is an object with the following structure:
@@ -1234,6 +1264,7 @@ def find_config_recorders2(ocredentials, fRegion):
 	return response
 
 
+# NOT IN USE: No current operations use this function
 def del_config_recorder2(ocredentials, fRegion, fConfig_recorder_name):
 	"""
 	ocredentials is an object with the following structure:
@@ -1255,6 +1286,7 @@ def del_config_recorder2(ocredentials, fRegion, fConfig_recorder_name):
 	return response  # There is no response to send back
 
 
+# IN USE: Used by config_recorders operation
 def find_delivery_channels2(ocredentials, fRegion):
 	"""
 	ocredentials is an object with the following structure:
@@ -1302,6 +1334,7 @@ def find_delivery_channels2(ocredentials, fRegion):
 	return response
 
 
+# NOT IN USE: No current operations use this function
 def del_delivery_channel2(ocredentials, fRegion, fDelivery_channel_name):
 	"""
 	ocredentials is an object with the following structure:
@@ -1324,6 +1357,7 @@ def del_delivery_channel2(ocredentials, fRegion, fDelivery_channel_name):
 	return response
 
 
+# NOT IN USE: No current operations use this function
 def del_config_recorder_or_delivery_channel2(deletion_item):
 	"""
 	ocredentials is an object with the following structure:
@@ -1354,6 +1388,7 @@ def del_config_recorder_or_delivery_channel2(deletion_item):
 	return response  # There is no response to send back
 
 
+# NOT IN USE: No current operations use this function
 def find_cloudtrails2(ocredentials, fRegion, fCloudTrailnames=None):
 	"""
 	ocredentials is an object with the following structure:
@@ -1432,6 +1467,7 @@ def find_cloudtrails2(ocredentials, fRegion, fCloudTrailnames=None):
 		return fullresponse
 
 
+# NOT IN USE: No current operations use this function
 def del_cloudtrails2(ocredentials, fRegion, fCloudTrail):
 	"""
 	ocredentials is an object with the following structure:
@@ -1490,6 +1526,7 @@ def del_cloudtrails2(ocredentials, fRegion, fCloudTrail):
 # 	return AllCWLogGroups
 
 
+# NOT IN USE: No current operations use this function
 def find_gd_invites2(ocredentials, fRegion):
 	"""
 	ocredentials is an object with the following structure:
@@ -1524,6 +1561,7 @@ def find_gd_invites2(ocredentials, fRegion):
 	return response
 
 
+# NOT IN USE: No current operations use this function
 def delete_gd_invites2(ocredentials, fRegion, fAccountId):
 	"""
 	ocredentials is an object with the following structure:
@@ -1556,6 +1594,7 @@ def delete_gd_invites2(ocredentials, fRegion, fAccountId):
 			print(my_Error)
 
 
+# IN USE: Used by instances operation
 def find_account_instances2(ocredentials=None):
 	"""
 	ocredentials is an object with the following structure:
@@ -1600,6 +1639,7 @@ def find_account_instances2(ocredentials=None):
 	return AllInstances
 
 
+# IN USE: Used by ecs_clusters operation
 def find_account_ecs_clusters_services_and_tasks2(ocredentials=None) -> list[dict[str, any]]:
 	"""
 	ocredentials is an object with the following structure:
@@ -1670,6 +1710,7 @@ def find_account_ecs_clusters_services_and_tasks2(ocredentials=None) -> list[dic
 	return AllECSClustersServicesAndTasks
 
 
+# NOT IN USE: No current operations use this function
 def find_cw_groups_retention2(ocredentials, fRegion: str = 'us-east-1'):
 	"""
 	ocredentials is an object with the following structure:
@@ -1699,6 +1740,7 @@ def find_cw_groups_retention2(ocredentials, fRegion: str = 'us-east-1'):
 	return AllLogGroups
 
 
+# IN USE: Used by rds_instances operation
 def find_account_rds_instances2(ocredentials=None, fRegion=None):
 	"""
 	ocredentials is an object with the following structure:
@@ -1753,6 +1795,7 @@ def find_account_rds_instances2(ocredentials=None, fRegion=None):
 	return AllInstances
 
 
+# IN USE: Used by gas operation
 def find_global_accelerators2(ocredentials=None):
 	"""
 	ocredentials is an object with the following structure:
@@ -1841,6 +1884,7 @@ def find_global_accelerators2(ocredentials=None):
 	return AllAccelerators
 
 
+# IN USE: Used by cloudtrail operation
 def find_account_cloudtrail2(ocredentials, fRegion='us-east-1'):
 	"""
 	ocredentials is an object with the following structure:
@@ -1877,6 +1921,7 @@ def find_account_cloudtrail2(ocredentials, fRegion='us-east-1'):
 	return AllTrails
 
 
+# IN USE: Used by subnets operation
 # def find_account_subnets2(ocredentials, fRegion=None, fipaddresses=None):
 def find_account_subnets2(ocredentials, fipaddresses=None):
 	"""
@@ -1942,6 +1987,7 @@ def find_account_subnets2(ocredentials, fipaddresses=None):
 	return AllSubnets
 
 
+# IN USE: Used by tgws operation
 def find_tgws2(ocredentials):
 	"""
 	ocredentials is an object with the following structure:
@@ -1999,6 +2045,7 @@ def find_tgws2(ocredentials):
 	return AllTGWs
 
 
+# NOT IN USE: No current operations use this function
 def find_attachments2(ocredentials):
 	"""
 	ocredentials is an object with the following structure:
@@ -2052,6 +2099,7 @@ def find_attachments2(ocredentials):
 	return AllAttachments
 
 
+# NOT IN USE: No current operations use this function
 def find_route_tables2(ocredentials):
 	"""
 	ocredentials is an object with the following structure:
@@ -2105,6 +2153,7 @@ def find_route_tables2(ocredentials):
 	return AllRouteTables
 
 
+# IN USE: Used by enis operation
 def find_account_enis2(ocredentials, fRegion=None, fipaddresses=None):
 	"""
 	@param: ocredentials is an object with the following structure:
@@ -2185,6 +2234,7 @@ def find_account_enis2(ocredentials, fRegion=None, fipaddresses=None):
 	return AllENIs
 
 
+# IN USE: Used by ebs_volumes operation
 def find_account_volumes2(ocredentials):
 	"""
 	ocredentials is an object with the following structure:
@@ -2254,6 +2304,7 @@ def find_account_volumes2(ocredentials):
 	return AllVolumes
 
 
+# IN USE: Used by policies operation
 def find_account_policies2(ocredentials, fRegion='us-east-1', fFragments: list = None, fExact: bool = False, fCMP: bool = False) -> list:
 	"""
 	ocredentials is an object with the following structure:
@@ -2331,6 +2382,7 @@ def find_account_policies2(ocredentials, fRegion='us-east-1', fFragments: list =
 	return AllPolicies
 
 
+# NOT IN USE: No current operations use this function
 def find_account_policies3(faws_acct, fRegion='us-east-1', fFragments=None):
 	"""
 	faws_acct is an aws_acct object
@@ -2378,6 +2430,7 @@ def find_account_policies3(faws_acct, fRegion='us-east-1', fFragments=None):
 	return AllPolicies
 
 
+# IN USE: Used by policies operation
 def find_policy_action2(ocredentials, fpolicy, f_action):
 	"""
 	ocredentials is an object with the following structure:
@@ -2453,6 +2506,7 @@ def find_policy_action2(ocredentials, fpolicy, f_action):
 	return results
 
 
+# IN USE: Used by org_users operation
 def find_iam_users2(ocredentials):
 	"""
 	ocredentials is an object with the following structure:
@@ -2490,6 +2544,7 @@ def find_iam_users2(ocredentials):
 	return users
 
 
+# IN USE: Used by org_users operation
 def find_idc_directory_id2(ocredentials) -> list:
 	"""
 	Description: Finds the IDC Directory ID
@@ -2513,6 +2568,7 @@ def find_idc_directory_id2(ocredentials) -> list:
 	return idc_directory_id_list
 
 
+# IN USE: Used by org_users operation
 def find_idc_users2(ocredentials, f_IdentityStoreId: str) -> list:
 	"""
 	Description: This function will find all users in an Identity Store.
@@ -2557,6 +2613,7 @@ def find_idc_users2(ocredentials, f_IdentityStoreId: str) -> list:
 	return users
 
 
+# NOT IN USE: No current operations use this function
 def find_profile_vpcs(fProfile, fRegion, fDefaultOnly):
 	# TODO: Needs paging
 	import boto3
@@ -2569,6 +2626,7 @@ def find_profile_vpcs(fProfile, fRegion, fDefaultOnly):
 	return vpcs
 
 
+# NOT IN USE: No current operations use this function
 def find_profile_functions(fProfile, fRegion):
 	import boto3
 	session_lambda = boto3.Session(profile_name=fProfile, region_name=fRegion)
@@ -2577,7 +2635,8 @@ def find_profile_functions(fProfile, fRegion):
 	return functions
 
 
-def find_lambda_functions2(ocredentials=None, fRegion=None, fSearchStrings=None, fTagValueToFilter: str = None):
+# IN USE: Used by functions operation
+def find_lambda_functions2(ocredentials=None, fRegion:str=None, fSearchStrings:list=None, fTagValueToFilter:list=None):
 	"""
 	Description: Finds all Lambda functions in the account
 	@ocredentials is an object with the following structure:
@@ -2587,77 +2646,106 @@ def find_lambda_functions2(ocredentials=None, fRegion=None, fSearchStrings=None,
 		- ['AccountNumber'] holds the AccountId
 		- ['Region'] holds the region for the credentials (optional)
 	@fRegion is a string
-	@fSearchString is a list of strings
+	@fSearchStrings is a list of strings
 	@fTagValueToFilter is a list of strings, to filter on only finding specific Lambda functions
 	"""
 	import boto3
 	import logging
-
-	def returnMatches(a, b):
-		logging.info("a: " + str(a))
-		logging.info("b: " + str(b))
-		return list(set(a) & set(b))
+	from typing import List, Dict, Any, Optional
 
 	if fSearchStrings is None:
 		fSearchStrings = ['all']
+	
+	# Ensure fTagValueToFilter is a list if provided
+	if fTagValueToFilter is not None and isinstance(fTagValueToFilter, str):
+		fTagValueToFilter = [fTagValueToFilter]
+
 	if ocredentials is None:
 		session_lambda = boto3.Session()
 	else:
-		session_lambda = boto3.Session(aws_access_key_id=ocredentials['AccessKeyId'],
-		                               aws_secret_access_key=ocredentials['SecretAccessKey'],
-		                               aws_session_token=ocredentials['SessionToken'],
-		                               region_name=ocredentials.get('Region', fRegion))
+		session_lambda = boto3.Session(
+			aws_access_key_id=ocredentials['AccessKeyId'],
+			aws_secret_access_key=ocredentials['SecretAccessKey'],
+			aws_session_token=ocredentials['SessionToken'],
+			region_name=ocredentials.get('Region', fRegion)
+		)
 
 	client_lambda = session_lambda.client('lambda')
+	
+	def _extract_function_data(function: Dict[str, Any]) -> Dict[str, Any]:
+		"""Extract standardized function data from AWS Lambda function object."""
+		return {
+			'FunctionName': function['FunctionName'],
+			'FunctionArn': function['FunctionArn'],
+			'Role': function['Role'],
+			'Runtime': function['Runtime'],
+		}
+
+	def _function_matches_tag_filter(lambda_function: Dict[str, Any], tag_filters: List[str]) -> bool:
+		"""Check if function has any of the specified tag values."""
+		if 'Tags' not in lambda_function:
+			return False
+		
+		function_tag_values = set(lambda_function['Tags'].values())
+		return any(tag_value in function_tag_values for tag_value in tag_filters)
+
 	try:
+		# Get all functions with pagination
 		functions = client_lambda.list_functions()
-		functions2 = functions['Functions']
-		logging.info(f"Found {len(functions)} functions")
-		while 'NextMarker' in functions.keys():
+		all_functions = functions['Functions']
+		logging.info(f"Found {len(all_functions)} functions initially")
+		
+		while 'NextMarker' in functions:
 			functions = client_lambda.list_functions(Marker=functions['NextMarker'])
-			functions2.extend(functions['Functions'])
-		AllFunctions = []
+			all_functions.extend(functions['Functions'])
+		
+		logging.info(f"Total functions found: {len(all_functions)}")
+		
+		# Filter by search strings first
+		filtered_functions = []
+		
 		if 'all' in fSearchStrings:
-			for function in functions2:
+			# Include all functions
+			for function in all_functions:
 				logging.info(f"Found function {function['FunctionName']}")
-				AllFunctions.append({'FunctionName'  : function['FunctionName'],
-				                     'FunctionArn'   : function['FunctionArn'],
-				                     'Role'          : function['Role'],
-				                     'Runtime'       : function['Runtime'],
-				                     'SecurityGroups': function['VpcConfig']['SecurityGroupIds'] if 'VpcConfig' in function.keys() and 'SecurityGroupIds' in function['VpcConfig'].keys() else None})
-			if fTagValueToFilter is not None:
-				AllFilteredFunctions = []
-				for lambda_item in AllFunctions:
-					lambda_function = client_lambda.get_function(FunctionName=lambda_item['FunctionArn'])
-					AllFilteredFunctions.append({'Function': lambda_function['Configuration'], 'Tags': lambda_function['Tags'] if 'Tags' in lambda_function.keys() and any(fTagValueToFilter in lambda_function['Tags'].values()) else []})
-				# for i in t:
-				# 	ts.extend([v for k, v in i['Tags'].items() if v == tag_value])
-
-				AllFunctions = AllFilteredFunctions.copy()
-			return AllFunctions
+				filtered_functions.append(_extract_function_data(function))
 		else:
-			for function in functions2:
-				for searchitem in fSearchStrings:
-					if searchitem in function['FunctionName'] or searchitem in function['Runtime']:
+			# Filter by search strings in name or runtime
+			for function in all_functions:
+				for search_item in fSearchStrings:
+					if search_item in function['FunctionName'] or search_item in function['Runtime']:
 						logging.info(f"Found function {function['FunctionName']}")
-						AllFunctions.append({'FunctionName'  : function['FunctionName'],
-						                     'FunctionArn'   : function['FunctionArn'],
-						                     'Role'          : function['Role'],
-						                     'Runtime'       : function['Runtime'],
-						                     'SecurityGroups': function['VpcConfig']['SecurityGroupIds'] if 'VpcConfig' in function.keys() and 'SecurityGroupIds' in function['VpcConfig'].keys() else None})
-			if fTagValueToFilter is not None:
-				AllFilteredFunctions = []
-				for lambda_item in AllFunctions:
+						filtered_functions.append(_extract_function_data(function))
+						break  # Avoid duplicates if multiple search terms match
+
+		# Apply tag filtering if specified
+		if fTagValueToFilter is not None:
+			tag_filtered_functions = []
+			for lambda_item in filtered_functions:
+				try:
 					lambda_function = client_lambda.get_function(FunctionName=lambda_item['FunctionArn'])
-					AllFilteredFunctions.append({'Function': lambda_function['Configuration'], 'Tags': lambda_function['Tags'] if 'Tags' in lambda_function.keys() else []})
-				AllFunctions = AllFilteredFunctions.copy()
-			return AllFunctions
+					
+					# Check if function matches tag filter
+					if _function_matches_tag_filter(lambda_function, fTagValueToFilter):
+						tag_filtered_functions.append({
+							'Function': lambda_function['Configuration'],
+							'Tags': lambda_function.get('Tags', {})
+						})
+				except Exception as e:
+					logging.warning(f"Failed to get function details for {lambda_item['FunctionName']}: {e}")
+					continue
+			
+			return tag_filtered_functions
+		
+		return filtered_functions
+		
 	except Exception as my_Error:
-		error_message = f"Error: {my_Error}"
-		logging.error(f"Error: {error_message}")
-		return
+		error_message = f"Error in find_lambda_functions2: {my_Error}"
+		logging.error(error_message)
+		return []
 
 
+# NOT IN USE: No current operations use this function
 def find_lambda_functions3(faws_acct, fRegion='us-east-1', fSearchStrings=None):
 	"""
 	ocredentials is an object with the following structure:
@@ -2693,6 +2781,7 @@ def find_lambda_functions3(faws_acct, fRegion='us-east-1', fSearchStrings=None):
 	return functions2
 
 
+# NOT IN USE: No current operations use this function
 def get_lambda_code_url(fprofile, fregion, fFunctionName):
 	import boto3
 	session_lambda = boto3.Session(profile_name=fprofile, region_name=fregion)
@@ -2701,6 +2790,7 @@ def get_lambda_code_url(fprofile, fregion, fFunctionName):
 	return code_url
 
 
+# IN USE: Used by directories operation
 def find_directories2(ocredentials, fRegion='us-east-1', fSearchStrings=None, fExact: bool = False):
 	"""
 	Description: This function will search for directories in an account/region
@@ -2842,6 +2932,7 @@ def find_directories2(ocredentials, fRegion='us-east-1', fSearchStrings=None, fE
 # 	return hosted_zones
 
 
+# IN USE: Used by phzs operation
 def find_private_hosted_zones2(ocredentials, fRegion=None):
 	"""
 	This library script returns the hosted zones within an account and a region
@@ -2862,6 +2953,7 @@ def find_private_hosted_zones2(ocredentials, fRegion=None):
 	return hosted_zones
 
 
+# NOT IN USE: No current operations use this function
 def find_private_hosted_zones3(faws_acct, fRegion=None):
 	"""
 	This library script returns the hosted zones within an account and a region
@@ -2881,6 +2973,7 @@ def find_private_hosted_zones3(faws_acct, fRegion=None):
 	return hosted_zones
 
 
+# NOT IN USE: No current operations use this function
 def find_load_balancers(fProfile, fRegion, fStackFragment='all', fStatus='all'):
 	import boto3
 	import logging
@@ -2909,6 +3002,7 @@ def find_load_balancers(fProfile, fRegion, fStackFragment='all', fStatus='all'):
 	return load_balancers_Copy
 
 
+# IN USE: Used by elbs operation
 def find_load_balancers2(ocredential=None, fStackFragments=None, fStatus=None) -> list:
 	"""
 	@Description: This library script returns the list of load balancers within an account and a region
@@ -2962,6 +3056,7 @@ def find_load_balancers2(ocredential=None, fStackFragments=None, fStatus=None) -
 	return load_balancers_Copy
 
 
+# NOT IN USE: No current operations use this function
 def find_load_balancers3(faws_acct, fRegion='us-east-1', fStackFragments=None, fStatus='all'):
 	"""
 	This library script returns the list of load balancers within an account and a region
@@ -2996,6 +3091,7 @@ def find_load_balancers3(faws_acct, fRegion='us-east-1', fStackFragments=None, f
 		raise Exception(f"Profile: {faws_acct.Profile} in Region: {faws_acct.Region} didn't authenticate properly. Please check credentials")
 
 
+# NOT IN USE: No current operations use this function
 def find_stacks(fProfile, fRegion, fStackFragment="all", fStatus="active"):
 	"""
 	fProfile refers to the name of the profile you're connecting to:
@@ -3122,6 +3218,7 @@ def find_stacks(fProfile, fRegion, fStackFragment="all", fStatus="active"):
 	return stacksCopy
 
 
+# IN USE: Used by cfnstacks operation
 def find_stacks2(ocredentials: dict, fRegion: str, fStackFragment: list = None, fStatus: list = None):
 	"""
 	ocredentials is an object with the following structure:
@@ -3256,6 +3353,7 @@ def find_stacks2(ocredentials: dict, fRegion: str, fStackFragment: list = None, 
 	return stacksCopy
 
 
+# NOT IN USE: No current operations use this function
 def find_stacks3(faws_acct, fRegion: str, fStackFragment: list = None):
 	"""
 	fProfile refers to the name of the profile you're connecting to:
@@ -3328,6 +3426,7 @@ def find_stacks3(faws_acct, fRegion: str, fStackFragment: list = None):
 		return AllStacks2
 
 
+# NOT IN USE: No current operations use this function
 def delete_stack(fprofile, fRegion, fStackName, **kwargs):
 	"""
 	fprofile is a string holding the name of the profile you're connecting to:
@@ -3355,6 +3454,7 @@ def delete_stack(fprofile, fRegion, fStackName, **kwargs):
 	return response
 
 
+# NOT IN USE: No current operations use this function
 def delete_stack2(ocredentials, fRegion, fStackName, **kwargs):
 	"""
 	ocredentials is an object with the following structure:
@@ -3393,6 +3493,7 @@ def delete_stack2(ocredentials, fRegion, fStackName, **kwargs):
 	return response
 
 
+# NOT IN USE: No current operations use this function
 def find_stacks_in_acct3(faws_acct, fRegion, fStackFragment="all", fStatus="active"):
 	"""
 	faws_acct is an object of the aws_acct class:
@@ -3482,6 +3583,7 @@ def find_stacks_in_acct3(faws_acct, fRegion, fStackFragment="all", fStatus="acti
 	return stacksCopy
 
 
+# IN USE: Used by saml_providers operation
 def find_saml_components_in_acct2(ocredentials):
 	"""
 	ocredentials is an object with the following structure:
@@ -3503,6 +3605,7 @@ def find_saml_components_in_acct2(ocredentials):
 	return saml_providers
 
 
+# IN USE: Used by cfnstacksets operation
 def find_stacksets2(ocredentials: dict, fStackFragments: list = None, fStatus: str = None):
 	"""
 	credentials is a dictionary containing the credentials for a given account
@@ -3564,6 +3667,7 @@ def find_stacksets2(ocredentials: dict, fStackFragments: list = None, fStatus: s
 	return stacksetsCopy
 
 
+# NOT IN USE: No current operations use this function
 def find_stacksets3(faws_acct, fRegion: str = None, fStackFragmentList: list = None, fExact: bool = False, fGetHealth: bool = False) -> dict:
 	"""
 	Description: returns a dict object with the list of stacksets if successful.
@@ -3752,6 +3856,7 @@ def find_stacksets3(faws_acct, fRegion: str = None, fStackFragmentList: list = N
 	return return_response
 
 
+# NOT IN USE: No current operations use this function
 def delete_stackset(fProfile, fRegion, fStackSetName):
 	"""
 	fProfile is a string holding the name of the profile you're connecting to:
@@ -3768,6 +3873,7 @@ def delete_stackset(fProfile, fRegion, fStackSetName):
 	return response
 
 
+# NOT IN USE: No current operations use this function
 def delete_stackset3(faws_acct, fRegion, fStackSetName):
 	"""
 	faws_acct is an object representing the account we're working in
@@ -3797,6 +3903,7 @@ def delete_stackset3(faws_acct, fRegion, fStackSetName):
 	return return_response
 
 
+# NOT IN USE: No current operations use this function
 def find_stack_instances(fProfile, fRegion, fStackSetName, fStatus='CURRENT'):
 	"""
 	fProfile is a string
@@ -3820,6 +3927,7 @@ def find_stack_instances(fProfile, fRegion, fStackSetName, fStatus='CURRENT'):
 	return stack_instances_list
 
 
+# IN USE: Used by cfnstacksets operation
 def find_stack_instances2(ocredentials, fRegion, fStackSetName, fStatus='CURRENT'):
 	"""
 	ocredentials is an object with the following structure:
@@ -3850,6 +3958,7 @@ def find_stack_instances2(ocredentials, fRegion, fStackSetName, fStatus='CURRENT
 	return stack_instances_list
 
 
+# NOT IN USE: No current operations use this function
 def find_stack_instances3(faws_acct, fRegion: str, fStackSetName: str, fStatus: str = 'CURRENT', faccountlist: list = None, fregionlist: list = None):
 	"""
 	faws_acct is a custom class containing the credentials
@@ -3923,6 +4032,7 @@ def find_stack_instances3(faws_acct, fRegion: str, fStackSetName: str, fStatus: 
 	return stack_instances_list
 
 
+# NOT IN USE: No current operations use this function
 def delete_stack_instances(fProfile, fRegion, lAccounts, lRegions, fStackSetName, fRetainStacks=False,
                            fOperationName="StackDelete"):
 	"""
@@ -3944,6 +4054,7 @@ def delete_stack_instances(fProfile, fRegion, lAccounts, lRegions, fStackSetName
 	return response  # There is no response to send back
 
 
+# NOT IN USE: No current operations use this function
 def delete_stack_instances3(faws_acct, fRegion, lRegions, fStackSetName, fRetainStacks=False,
                             fOperationName=None, lAccounts=None, fPermissionModel='SELF_MANAGED', fDeploymentTarget=None):
 	"""
@@ -4033,6 +4144,7 @@ def delete_stack_instances3(faws_acct, fRegion, lRegions, fStackSetName, fRetain
 	return return_response  # The response will be the Operation ID of the delete operation or an Error Message
 
 
+# NOT IN USE: No current operations use this function
 def check_stack_set_status3(faws_acct, fStack_set_name, fOperationId=None):
 	"""
 	response = client.describe_stack_set_operation(
@@ -4075,6 +4187,7 @@ def check_stack_set_status3(faws_acct, fStack_set_name, fOperationId=None):
 	return return_response
 
 
+# NOT IN USE: No current operations use this function
 def find_if_stack_set_exists3(faws_acct, fStack_set_name):
 	"""
 	response = client.describe_stack_set(
@@ -4097,6 +4210,7 @@ def find_if_stack_set_exists3(faws_acct, fStack_set_name):
 	return return_response
 
 
+# NOT IN USE: No current operations use this function
 def find_sc_products(fProfile, fRegion, fStatus="ERROR", flimit=100):
 	"""
 	fProfile is the Root Profile that owns the Account we're interrogating
@@ -4151,6 +4265,7 @@ def find_sc_products(fProfile, fRegion, fStatus="ERROR", flimit=100):
 	return response2
 
 
+# NOT IN USE: No current operations use this function
 def find_sc_products3(faws_acct, fStatus="ERROR", flimit=100, fproductId=None):
 	"""
 	faws_acct is the Org account that we're interrogating
@@ -4228,6 +4343,7 @@ def find_sc_products3(faws_acct, fStatus="ERROR", flimit=100, fproductId=None):
 	return response2
 
 
+# NOT IN USE: No current operations use this function
 def find_ssm_parameters(fProfile, fRegion):
 	"""
 	fProfile is the Root Profile that owns the stackset
@@ -4304,6 +4420,7 @@ def find_ssm_parameters(fProfile, fRegion):
 	return response2
 
 
+# NOT IN USE: No current operations use this function
 def find_ssm_parameters2(ocredentials):
 	"""
 	ocredentials is an object with the following structure:
@@ -4392,6 +4509,7 @@ def find_ssm_parameters2(ocredentials):
 	return response2
 
 
+# NOT IN USE: No current operations use this function
 def find_ssm_parameters3(faws_acct, fregion=None):
 	"""
 	faws_acct is the class object from account_class.py
@@ -4470,6 +4588,7 @@ def find_ssm_parameters3(faws_acct, fregion=None):
 	return response2
 
 
+# NOT IN USE: No current operations use this function
 def random_string(stringLength=10):
 	"""
 	Description: Generates a random string, to add to the session object when connecting to an account - to make the session unique
@@ -4484,6 +4603,7 @@ def random_string(stringLength=10):
 	return randomstring
 
 
+# IN USE: Used by azs operation
 def get_region_azs2(ocredentials):
 	"""
 	ocredentials is an object with the following structure:
@@ -4553,6 +4673,7 @@ def get_region_azs2(ocredentials):
 ############
 
 
+# IN USE: Used by all operations for displaying results
 def display_results(results_list, fdisplay_dict: dict, defaultAction=None, file_to_save: str = None, subdisplay: bool = False):
 	from colorama import init, Fore
 	from datetime import datetime
@@ -4912,6 +5033,7 @@ def display_results(results_list, fdisplay_dict: dict, defaultAction=None, file_
 		handle_dict()
 
 
+# IN USE: Used by all operations for getting AWS credentials
 def get_all_credentials(fProfiles: list = None, fTiming: bool = False, fSkipProfiles: list = None, fSkipAccounts: list = None, fRootOnly: bool = False, fAccounts: list = None, fRegionList: list = None, RoleList: list = None) -> list:
 	"""
 	Flow for this function:
@@ -5002,6 +5124,7 @@ def get_all_credentials(fProfiles: list = None, fTiming: bool = False, fSkipProf
 	return AllCredentials
 
 
+# IN USE: Used by orgs operation
 def get_credentials_for_accounts_in_org(faws_acct, fSkipAccounts=None, fRootOnly=False, accountlist=None, fprofile="default", fregions=None, fRoleNames=None, fTiming=False, MaxThreads: int = 50):
 	"""
 	Note that this function returns the credentials of all the accounts underneath the Org passed to it.
@@ -5148,6 +5271,7 @@ def get_credentials_for_accounts_in_org(faws_acct, fSkipAccounts=None, fRootOnly
 	return AllCreds
 
 
+# IN USE: Used by orgs operation
 def get_org_accounts_from_profiles(fProfileList=None):
 	"""
 	Note that this function returns account_class objects based on the list of profiles passed to it
