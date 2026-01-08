@@ -14,10 +14,10 @@ from colorama import Fore, init
 import boto3
 
 from inv_scr.core import Inventory_Modules
-from inv_scr.core.Inventory_Modules import get_all_credentials, display_results
+from inv_scr.core.Inventory_Modules import get_all_credentials, display_results, find_lambda_functions2
 
 init()
-__version__ = "2025.12.16"
+__version__ = "2026.01.08"
 
 ERASE_LINE = '\x1b[2K'
 
@@ -74,7 +74,7 @@ def find_all_lambda_functions(fAllCredentials: list, fFragments: list = None) ->
                 c_account_credentials, c_fragment_list = self.queue.get()
                 logging.info(f"De-queued info for account {c_account_credentials['AccountId']}")
                 try:
-                    Functions = Inventory_Modules.find_lambda_functions2(c_account_credentials, c_account_credentials['Region'], c_fragment_list)
+                    Functions = find_lambda_functions2(c_account_credentials, c_account_credentials['Region'], c_fragment_list)
                     function_count = len(Functions) if Functions else 0
                     logging.info(f"Account: {c_account_credentials['AccountId']} Region: {c_account_credentials['Region']} | Found {function_count} functions")
                     

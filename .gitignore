@@ -20,6 +20,10 @@ Thumbs.db
 Superseded
 *~
 
+# Ignore AI specific files
+ai_docs/
+ai_bin/
+
 # Old directories and their contents
 #old/*
 #*/old/*
@@ -39,6 +43,9 @@ logs/
 *.swp
 *.swo
 *~
+
+# Hiding the .coverage file
+.coverage
 
 # Node.js (if any)
 node_modules/
