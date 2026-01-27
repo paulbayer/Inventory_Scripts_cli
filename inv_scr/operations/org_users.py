@@ -53,6 +53,7 @@ def _find_all_org_users(
     """
     users: List[Dict[str, Any]] = []
     directories_seen = set()
+    iam_accounts_seen = set()  # Track accounts we've already queried for IAM users
 
     for cred in tqdm(
         credentials,
@@ -67,27 +68,31 @@ def _find_all_org_users(
             )
             continue
 
+        # IAM is global - only query once per account, not per region
         if include_iam:
-            try:
-                iam_users = find_iam_users2(cred)
-                for user in iam_users:
-                    users.append(
-                        {
-                            'MgmtAccount': cred['MgmtAccount'],
-                            'AccountId': cred['AccountId'],
-                            'Region': cred['Region'],
-                            'UserName': user.get('UserName', ''),
-                            'PasswordLastUsed': user.get('PasswordLastUsed', ''),
-                            'Type': 'IAM',
-                        }
-                    )
-            except ClientError as err:
-                if 'AuthFailure' in str(err):
-                    logging.error(
-                        "Authorization failure for IAM in %s (%s)",
-                        cred['AccountId'],
-                        cred['Region'],
-                    )
+            account_id = cred['AccountId']
+            if account_id not in iam_accounts_seen:
+                iam_accounts_seen.add(account_id)
+                try:
+                    iam_users = find_iam_users2(cred)
+                    for user in iam_users:
+                        users.append(
+                            {
+                                'MgmtAccount': cred['MgmtAccount'],
+                                'AccountId': cred['AccountId'],
+                                'Region': cred['Region'],
+                                'UserName': user.get('UserName', ''),
+                                'PasswordLastUsed': user.get('PasswordLastUsed', ''),
+                                'Type': 'IAM',
+                            }
+                        )
+                except ClientError as err:
+                    if 'AuthFailure' in str(err):
+                        logging.error(
+                            "Authorization failure for IAM in %s (%s)",
+                            cred['AccountId'],
+                            cred['Region'],
+                        )
 
         if include_idc:
             try:
