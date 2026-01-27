@@ -2636,6 +2636,7 @@ def find_profile_functions(fProfile, fRegion):
 
 
 # IN USE: Used by functions operation
+# WILL BE IN USE: find_security_groups, CT_CheckAccount, ALZ_CheckAccount... 
 def find_lambda_functions2(ocredentials=None, fRegion:str=None, fSearchStrings:list=None, fTagValueToFilter:list=None):
 	"""
 	Description: Finds all Lambda functions in the account

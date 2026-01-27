@@ -254,3 +254,110 @@ class TestArgumentParsing(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestEnisOperationArguments(unittest.TestCase):
+    """Test cases for ENIs operation-specific arguments"""
+
+    def setUp(self):
+        """Set up test fixtures"""
+        from inv_scr.operations import enis
+        self.parser = CommonArguments()
+        self.parser.multiprofile()
+        self.parser.multiregion()
+        self.parser.extendedargs()
+        self.parser.rootOnly()
+        self.parser.timing()
+        self.parser.save_to_file()
+        self.parser.verbosity()
+        enis.add_operation_args(self.parser)
+
+    def test_ipaddress_argument(self):
+        """Test --ipaddress argument parsing"""
+        args = self.parser.my_parser.parse_args(['--ipaddress', '1.2.3.4', '5.6.7.8'])
+        self.assertEqual(args.pipaddresses, ['1.2.3.4', '5.6.7.8'])
+
+    def test_ipaddress_alias(self):
+        """Test --ip alias for --ipaddress"""
+        args = self.parser.my_parser.parse_args(['--ip', '1.2.3.4'])
+        self.assertEqual(args.pipaddresses, ['1.2.3.4'])
+
+    def test_fqdn_argument(self):
+        """Test --fqdn argument parsing"""
+        args = self.parser.my_parser.parse_args(['--fqdn', 'example.com', 'test.example.com'])
+        self.assertEqual(args.pDNSNames, ['example.com', 'test.example.com'])
+
+    def test_fqdn_alias(self):
+        """Test --name alias for --fqdn"""
+        args = self.parser.my_parser.parse_args(['--name', 'example.com'])
+        self.assertEqual(args.pDNSNames, ['example.com'])
+
+    def test_fqdn_single_value(self):
+        """Test --fqdn with single value"""
+        args = self.parser.my_parser.parse_args(['--fqdn', 'example.com'])
+        self.assertEqual(args.pDNSNames, ['example.com'])
+
+    def test_fqdn_multiple_values(self):
+        """Test --fqdn with multiple values"""
+        args = self.parser.my_parser.parse_args(['--fqdn', 'example.com', 'api.example.com', 'www.example.com'])
+        self.assertEqual(args.pDNSNames, ['example.com', 'api.example.com', 'www.example.com'])
+
+    def test_public_only_argument(self):
+        """Test --public-only argument parsing"""
+        args = self.parser.my_parser.parse_args(['--public-only'])
+        self.assertTrue(args.ppublic)
+
+    def test_public_only_alias(self):
+        """Test --po alias for --public-only"""
+        args = self.parser.my_parser.parse_args(['--po'])
+        self.assertTrue(args.ppublic)
+
+    def test_combined_ipaddress_and_fqdn(self):
+        """Test using both --ipaddress and --fqdn together"""
+        args = self.parser.my_parser.parse_args([
+            '--ipaddress', '1.2.3.4', '5.6.7.8',
+            '--fqdn', 'example.com', 'test.example.com'
+        ])
+        self.assertEqual(args.pipaddresses, ['1.2.3.4', '5.6.7.8'])
+        self.assertEqual(args.pDNSNames, ['example.com', 'test.example.com'])
+
+    def test_fqdn_with_public_only(self):
+        """Test --fqdn with --public-only"""
+        args = self.parser.my_parser.parse_args([
+            '--fqdn', 'example.com',
+            '--public-only'
+        ])
+        self.assertEqual(args.pDNSNames, ['example.com'])
+        self.assertTrue(args.ppublic)
+
+    def test_all_enis_arguments_combined(self):
+        """Test all ENIs-specific arguments together"""
+        args = self.parser.my_parser.parse_args([
+            '--profiles', 'profile1', 'profile2',
+            '--regions', 'us-east-1', 'us-west-2',
+            '--ipaddress', '1.2.3.4',
+            '--fqdn', 'example.com', 'test.example.com',
+            '--public-only',
+            '--verbose'
+        ])
+        self.assertEqual(args.Profiles, ['profile1', 'profile2'])
+        self.assertEqual(args.Regions, ['us-east-1', 'us-west-2'])
+        self.assertEqual(args.pipaddresses, ['1.2.3.4'])
+        self.assertEqual(args.pDNSNames, ['example.com', 'test.example.com'])
+        self.assertTrue(args.ppublic)
+        self.assertEqual(args.loglevel, 30)
+
+    def test_fqdn_default_none(self):
+        """Test that --fqdn defaults to None when not provided"""
+        args = self.parser.my_parser.parse_args([])
+        self.assertIsNone(args.pDNSNames)
+
+    def test_ipaddress_default_none(self):
+        """Test that --ipaddress defaults to None when not provided"""
+        args = self.parser.my_parser.parse_args([])
+        self.assertIsNone(args.pipaddresses)
+
+    def test_public_only_default_false(self):
+        """Test that --public-only defaults to False when not provided"""
+        args = self.parser.my_parser.parse_args([])
+        self.assertFalse(args.ppublic)

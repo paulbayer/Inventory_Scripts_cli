@@ -2,10 +2,12 @@
 """Elastic Network Interfaces inventory operation"""
 
 import logging
+import socket
 from queue import Queue
 from threading import Thread
 from tqdm.auto import tqdm
 from botocore.exceptions import ClientError
+from colorama import Fore
 
 from inv_scr.core import Inventory_Modules
 from inv_scr.core.Inventory_Modules import get_all_credentials, display_results
@@ -22,6 +24,14 @@ def add_operation_args(parser):
         metavar="IP address",
         default=None,
         help="IP address(es) you're looking for within your accounts"
+    )
+    local.add_argument(
+        "--fqdn", "--name",
+        dest="pDNSNames",
+        nargs="*",
+        metavar="Fully Qualified Domain Name",
+        default=None,
+        help="DNS Name(s) you're looking to find within your accounts"
     )
     local.add_argument(
         "--public-only", "--po",
@@ -101,6 +111,28 @@ def find_all_enis(fAllCredentials: list, fip: list = None, fPublicOnly: bool = F
     pbar.close()
     return AllENIs
 
+
+def resolve_names_to_ips(f_fqdns: list = None):
+    """
+    Resolves names to IPs before we begin to search
+    @param f_fqdns: A list of names that need to be resolved to external IP addresses, to search on
+    @return: A list - containing the IP addresses for the names passed in
+    """
+    # Resolve FQDNs to IP addresses using DNS lookup
+    resolved_ips = []
+    for fqdn in f_fqdns:
+        try:
+            # Get all IP addresses for the FQDN
+            result = socket.getaddrinfo(fqdn, None)
+            # Extract unique IP addresses from the result
+            ips = {'fqdn': fqdn, 'IPs': list(set([addr[4][0] for addr in result]))}
+            resolved_ips.append(ips)
+            logging.info(f"Resolved {fqdn} to IPs: {ips}")
+        except socket.gaierror as e:
+            logging.warning(f"Failed to resolve {fqdn}: {e}")
+
+    return resolved_ips
+
 def run(args):
     """Main execution function for enis operation"""
     # Get timing context from CLI (if available)
@@ -114,10 +146,12 @@ def run(args):
     pSkipProfiles = args.SkipProfiles
     pAccessRoles = args.AccessRoles
     pIPaddressList = getattr(args, 'pipaddresses', None)
+    pDNSNames = getattr(args, 'pDNSNames', None)
     pPublicOnly = getattr(args, 'ppublic', False)
     pRootOnly = args.RootOnly
     pFilename = args.Filename
     pTiming = args.Time
+    verbose = args.loglevel
     
     print("Searching for Elastic Network Interfaces...")
     print(f"Operation version: {__version__}")
@@ -138,6 +172,17 @@ def run(args):
     
     if timing:
         timing.milestone("credentials_setup", f"Credential setup for {AccountNum} accounts across {RegionNum} regions")
+    
+    # Resolve FQDNs to IPs and add to IP address list
+    fqdn_resolutions = []
+    if pDNSNames is not None:
+        fqdn_resolutions = resolve_names_to_ips(pDNSNames)
+        fqdn_ips = [ip for x in fqdn_resolutions for ip in x['IPs']]
+        
+        if pIPaddressList is None:
+            pIPaddressList = fqdn_ips
+        else:
+            pIPaddressList.extend(fqdn_ips)
     
     # Find all ENIs
     AllENIs = find_all_enis(CredentialList, pIPaddressList, pPublicOnly)
@@ -173,3 +218,9 @@ def run(args):
     print(f"\nFound {len(AllENIs)} ENIs{' with public IPs' if pPublicOnly else ''} across {AccountNum} accounts and {RegionNum} regions")
     if detached_enis:
         print(f"Found {len(detached_enis)} ENIs that are not listed as 'in-use' and may be costing additional money while unused.")
+    
+    # Display DNS resolution results if FQDNs were provided
+    if pDNSNames is not None and verbose < 50:
+        print(f"\nYou asked me to resolve {len(pDNSNames)} DNS Names")
+        for fqdn in fqdn_resolutions:
+            print(f"    DNS Name: {Fore.RED}{fqdn['fqdn']}{Fore.RESET} resolved to {Fore.RED}{fqdn['IPs']}{Fore.RESET}")

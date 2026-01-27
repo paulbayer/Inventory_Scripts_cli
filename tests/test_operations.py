@@ -5,6 +5,7 @@ Unit tests for operation modules
 
 import unittest
 import sys
+import socket
 from unittest.mock import patch, MagicMock, call
 import io
 from datetime import datetime
@@ -1416,7 +1417,7 @@ class TestFunctionsOperation(unittest.TestCase):
 
     # Enhanced credential-level mocking tests for Lambda functions
     @patch('inv_scr.operations.functions.get_all_credentials')
-    @patch('inv_scr.operations.functions.Inventory_Modules.find_lambda_functions2')
+    @patch('inv_scr.operations.functions.find_lambda_functions2')
     @patch('inv_scr.operations.functions.display_results')
     @patch('sys.stdout', new_callable=io.StringIO)
     def test_run_with_comprehensive_lambda_data(self, mock_stdout, mock_display, mock_find_account, mock_get_creds):
@@ -1481,7 +1482,7 @@ class TestFunctionsOperation(unittest.TestCase):
             self.assertEqual(function['Role'], f'test-lambda-role-{i}')
 
     @patch('inv_scr.operations.functions.get_all_credentials')
-    @patch('inv_scr.operations.functions.Inventory_Modules.find_lambda_functions2')
+    @patch('inv_scr.operations.functions.find_lambda_functions2')
     @patch('inv_scr.operations.functions.display_results')
     @patch('sys.stdout', new_callable=io.StringIO)
     def test_run_with_runtime_filtering_logic(self, mock_stdout, mock_display, mock_find_account, mock_get_creds):
@@ -3137,7 +3138,9 @@ class TestEnisOperation(unittest.TestCase):
         self.mock_args.Filename = None
         self.mock_args.Time = False
         self.mock_args.pipaddresses = None
+        self.mock_args.pDNSNames = None
         self.mock_args.ppublic = False
+        self.mock_args.loglevel = 50
 
     def test_add_operation_args_function_exists(self):
         """Test that add_operation_args function exists"""
@@ -3195,6 +3198,201 @@ class TestEnisOperation(unittest.TestCase):
         """Test find_all_enis with empty credentials list"""
         result = enis.find_all_enis([])
         self.assertEqual(result, [])
+
+    def test_resolve_names_to_ips_function_exists(self):
+        """Test that resolve_names_to_ips function exists"""
+        self.assertTrue(hasattr(enis, 'resolve_names_to_ips'))
+        self.assertTrue(callable(enis.resolve_names_to_ips))
+
+    @patch('socket.getaddrinfo')
+    def test_resolve_names_to_ips_single_fqdn(self, mock_getaddrinfo):
+        """Test resolving a single FQDN to IP addresses"""
+        # Mock DNS resolution returning IPv4 address
+        mock_getaddrinfo.return_value = [
+            (2, 1, 6, '', ('93.184.216.34', 0))
+        ]
+        
+        result = enis.resolve_names_to_ips(['example.com'])
+        
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['fqdn'], 'example.com')
+        self.assertIn('93.184.216.34', result[0]['IPs'])
+        mock_getaddrinfo.assert_called_once_with('example.com', None)
+
+    @patch('socket.getaddrinfo')
+    def test_resolve_names_to_ips_multiple_fqdns(self, mock_getaddrinfo):
+        """Test resolving multiple FQDNs to IP addresses"""
+        # Mock DNS resolution for different domains
+        def mock_dns_lookup(fqdn, port):
+            if fqdn == 'example.com':
+                return [(2, 1, 6, '', ('93.184.216.34', 0))]
+            elif fqdn == 'test.example.com':
+                return [(2, 1, 6, '', ('192.0.2.1', 0))]
+            return []
+        
+        mock_getaddrinfo.side_effect = mock_dns_lookup
+        
+        result = enis.resolve_names_to_ips(['example.com', 'test.example.com'])
+        
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]['fqdn'], 'example.com')
+        self.assertIn('93.184.216.34', result[0]['IPs'])
+        self.assertEqual(result[1]['fqdn'], 'test.example.com')
+        self.assertIn('192.0.2.1', result[1]['IPs'])
+
+    @patch('socket.getaddrinfo')
+    def test_resolve_names_to_ips_multiple_ips_per_fqdn(self, mock_getaddrinfo):
+        """Test resolving FQDN that returns multiple IP addresses"""
+        # Mock DNS resolution returning multiple IPs
+        mock_getaddrinfo.return_value = [
+            (2, 1, 6, '', ('93.184.216.34', 0)),
+            (2, 1, 6, '', ('93.184.216.35', 0)),
+            (10, 1, 6, '', ('2606:2800:220:1:248:1893:25c8:1946', 0))
+        ]
+        
+        result = enis.resolve_names_to_ips(['example.com'])
+        
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['fqdn'], 'example.com')
+        # Should have both IPv4 and IPv6 addresses
+        self.assertGreaterEqual(len(result[0]['IPs']), 2)
+
+    @patch('socket.getaddrinfo')
+    def test_resolve_names_to_ips_dns_failure(self, mock_getaddrinfo):
+        """Test handling of DNS resolution failure"""
+        # Mock DNS resolution failure
+        mock_getaddrinfo.side_effect = socket.gaierror("Name or service not known")
+        
+        result = enis.resolve_names_to_ips(['nonexistent.invalid'])
+        
+        # Should return empty list for failed resolution
+        self.assertEqual(len(result), 0)
+
+    @patch('socket.getaddrinfo')
+    def test_resolve_names_to_ips_partial_failure(self, mock_getaddrinfo):
+        """Test handling when some FQDNs resolve and others fail"""
+        def mock_dns_lookup(fqdn, port):
+            if fqdn == 'example.com':
+                return [(2, 1, 6, '', ('93.184.216.34', 0))]
+            else:
+                raise socket.gaierror("Name or service not known")
+        
+        mock_getaddrinfo.side_effect = mock_dns_lookup
+        
+        result = enis.resolve_names_to_ips(['example.com', 'nonexistent.invalid'])
+        
+        # Should return only the successful resolution
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['fqdn'], 'example.com')
+
+    @patch('inv_scr.operations.enis.get_all_credentials')
+    @patch('inv_scr.operations.enis.find_all_enis')
+    @patch('inv_scr.operations.enis.display_results')
+    @patch('inv_scr.operations.enis.resolve_names_to_ips')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_fqdn_parameter(self, mock_stdout, mock_resolve, mock_display, mock_find, mock_creds):
+        """Test run function with FQDN parameter"""
+        # Set up FQDN parameter
+        self.mock_args.pDNSNames = ['example.com']
+        
+        # Mock DNS resolution
+        mock_resolve.return_value = [
+            {'fqdn': 'example.com', 'IPs': ['93.184.216.34']}
+        ]
+        
+        # Mock credentials
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-east-1', 'MgmtAccount': '123456789012'}
+        ]
+        
+        # Mock ENIs found
+        mock_find.return_value = [
+            {
+                'MgmtAccount': '123456789012',
+                'AccountId': '123456789012',
+                'Region': 'us-east-1',
+                'ENIId': 'eni-12345678',
+                'PrivateDnsName': 'ip-10-0-1-100.ec2.internal',
+                'Status': 'in-use',
+                'PublicIp': '93.184.216.34',
+                'PrivateIpAddress': '10.0.1.100',
+                'ParentProfile': 'test-profile'
+            }
+        ]
+        
+        enis.run(self.mock_args)
+        
+        # Verify DNS resolution was called
+        mock_resolve.assert_called_once_with(['example.com'])
+        
+        # Verify find_all_enis was called with resolved IPs
+        call_args = mock_find.call_args
+        self.assertIn('93.184.216.34', call_args[0][1])
+
+    @patch('inv_scr.operations.enis.get_all_credentials')
+    @patch('inv_scr.operations.enis.find_all_enis')
+    @patch('inv_scr.operations.enis.display_results')
+    @patch('inv_scr.operations.enis.resolve_names_to_ips')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_fqdn_and_ipaddress(self, mock_stdout, mock_resolve, mock_display, mock_find, mock_creds):
+        """Test run function with both FQDN and IP address parameters"""
+        # Set up both FQDN and IP parameters
+        self.mock_args.pDNSNames = ['example.com']
+        self.mock_args.pipaddresses = ['1.2.3.4']
+        
+        # Mock DNS resolution
+        mock_resolve.return_value = [
+            {'fqdn': 'example.com', 'IPs': ['93.184.216.34']}
+        ]
+        
+        # Mock credentials
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-east-1', 'MgmtAccount': '123456789012'}
+        ]
+        
+        # Mock ENIs found
+        mock_find.return_value = []
+        
+        enis.run(self.mock_args)
+        
+        # Verify find_all_enis was called with both original and resolved IPs
+        call_args = mock_find.call_args
+        ip_list = call_args[0][1]
+        self.assertIn('1.2.3.4', ip_list)
+        self.assertIn('93.184.216.34', ip_list)
+
+    @patch('inv_scr.operations.enis.get_all_credentials')
+    @patch('inv_scr.operations.enis.find_all_enis')
+    @patch('inv_scr.operations.enis.display_results')
+    @patch('inv_scr.operations.enis.resolve_names_to_ips')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_fqdn_verbose_output(self, mock_stdout, mock_resolve, mock_display, mock_find, mock_creds):
+        """Test run function displays DNS resolution results in verbose mode"""
+        # Set up FQDN parameter and verbose logging
+        self.mock_args.pDNSNames = ['example.com', 'test.example.com']
+        self.mock_args.loglevel = 40  # Less than 50 to trigger verbose output
+        
+        # Mock DNS resolution
+        mock_resolve.return_value = [
+            {'fqdn': 'example.com', 'IPs': ['93.184.216.34']},
+            {'fqdn': 'test.example.com', 'IPs': ['192.0.2.1', '192.0.2.2']}
+        ]
+        
+        # Mock credentials
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-east-1', 'MgmtAccount': '123456789012'}
+        ]
+        
+        # Mock ENIs found
+        mock_find.return_value = []
+        
+        enis.run(self.mock_args)
+        
+        # Check output contains DNS resolution information
+        output = mock_stdout.getvalue()
+        self.assertIn("resolve 2 DNS Names", output)
+        self.assertIn("example.com", output)
+        self.assertIn("test.example.com", output)
 
 
 class TestEcsClustersOperation(unittest.TestCase):
