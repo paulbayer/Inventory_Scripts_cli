@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
 Organization users inventory operation (IAM + Identity Center)
+Finds any users within either IAM (shouldn't be any!) 
+or IdC (note - these may be connected to an on-prem directory, so this may not be a problem)
 """
 
 import logging
@@ -18,7 +20,7 @@ from inv_scr.core.Inventory_Modules import (
     find_idc_directory_id2,
 )
 
-__version__ = "2025.07.10"
+__version__ = "2026.01.27"
 
 
 def add_operation_args(parser):
