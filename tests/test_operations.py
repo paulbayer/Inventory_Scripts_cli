@@ -17,7 +17,7 @@ from inv_scr.operations import (
     instances, vpcs, cfnstacks, cfnstacksets, ebs_volumes, elbs, functions, orgs,
     rds_instances, subnets, phzs, enis, ecs_clusters, directories, gas, gd_detectors,
     policies, roles, saml_providers, tgws, topics, ram_shares, config_recorders,
-    cloudtrail, azs, org_users
+    cloudtrail, azs, org_users, remove_iam_user
 )
 from tests.mock_fixtures import MockCredentialFixtures, MockAWSResponseFixtures, MockOperationHelpers
 
@@ -4076,3 +4076,366 @@ class TestTopicsOperation(unittest.TestCase):
         """Test find_all_topics with empty credentials list"""
         result = topics.find_all_topics([])
         self.assertEqual(result, [])
+
+
+class TestRemoveIamUserOperation(unittest.TestCase):
+    """Test cases for the remove-iam-user operation"""
+
+    def setUp(self):
+        """Set up test fixtures"""
+        self.mock_args = MagicMock()
+        self.mock_args.Profiles = ['test-profile']
+        self.mock_args.Regions = ['us-east-1']
+        self.mock_args.Accounts = None
+        self.mock_args.SkipAccounts = None
+        self.mock_args.SkipProfiles = None
+        self.mock_args.AccessRoles = None
+        self.mock_args.RootOnly = False
+        self.mock_args.Time = False
+        self.mock_args.pUsername = 'test-user'
+        self.mock_args.pForce = False
+        self.mock_args.pDryRun = False
+
+    def test_add_operation_args_function_exists(self):
+        """Test that add_operation_args function exists"""
+        self.assertTrue(hasattr(remove_iam_user, 'add_operation_args'))
+        self.assertTrue(callable(remove_iam_user.add_operation_args))
+
+    def test_run_function_exists(self):
+        """Test that run function exists"""
+        self.assertTrue(hasattr(remove_iam_user, 'run'))
+        self.assertTrue(callable(remove_iam_user.run))
+
+    def test_find_user_resources_function_exists(self):
+        """Test that _find_user_resources function exists"""
+        self.assertTrue(hasattr(remove_iam_user, '_find_user_resources'))
+        self.assertTrue(callable(remove_iam_user._find_user_resources))
+
+    def test_remove_user_resources_function_exists(self):
+        """Test that _remove_user_resources function exists"""
+        self.assertTrue(hasattr(remove_iam_user, '_remove_user_resources'))
+        self.assertTrue(callable(remove_iam_user._remove_user_resources))
+
+    @patch('inv_scr.operations.remove_iam_user.get_all_credentials')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_missing_username(self, mock_stdout, mock_creds):
+        """Test run function with missing username"""
+        self.mock_args.pUsername = None
+        
+        remove_iam_user.run(self.mock_args)
+        
+        output = mock_stdout.getvalue()
+        self.assertIn("Error: +username is required", output)
+        mock_creds.assert_not_called()
+
+    @patch('inv_scr.operations.remove_iam_user.get_all_credentials')
+    @patch('inv_scr.operations.remove_iam_user._find_user_resources')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_user_not_found(self, mock_stdout, mock_find, mock_creds):
+        """Test run function when user is not found"""
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-east-1', 'MgmtAccount': '123456789012'}
+        ]
+        
+        mock_find.return_value = {
+            'found': False,
+            'account_id': None,
+            'credentials': None,
+            'user_details': None,
+            'access_keys': [],
+            'mfa_devices': [],
+            'signing_certificates': [],
+            'ssh_public_keys': [],
+            'service_specific_credentials': [],
+            'login_profile': None,
+            'attached_policies': [],
+            'inline_policies': [],
+            'groups': [],
+        }
+        
+        remove_iam_user.run(self.mock_args)
+        
+        output = mock_stdout.getvalue()
+        self.assertIn("not found", output)
+
+    @patch('inv_scr.operations.remove_iam_user.get_all_credentials')
+    @patch('inv_scr.operations.remove_iam_user._find_user_resources')
+    @patch('inv_scr.operations.remove_iam_user._remove_user_resources')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_dry_run_mode(self, mock_stdout, mock_remove, mock_find, mock_creds):
+        """Test run function in dry-run mode"""
+        self.mock_args.pDryRun = True
+        
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-east-1', 'MgmtAccount': '123456789012',
+             'AccessKeyId': 'AKIAIOSFODNN7EXAMPLE', 'SecretAccessKey': 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+             'SessionToken': 'token123'}
+        ]
+        
+        mock_find.return_value = {
+            'found': True,
+            'account_id': '123456789012',
+            'credentials': mock_creds.return_value[0],
+            'user_details': {'UserName': 'test-user', 'UserId': 'AIDAI23HXS4EXAMPLE'},
+            'access_keys': [{'AccessKeyId': 'AKIAIOSFODNN7EXAMPLE'}],
+            'mfa_devices': [],
+            'signing_certificates': [],
+            'ssh_public_keys': [],
+            'service_specific_credentials': [],
+            'login_profile': None,
+            'attached_policies': [],
+            'inline_policies': [],
+            'groups': [],
+        }
+        
+        mock_remove.return_value = {
+            'success': True,
+            'removed_resources': [],
+            'errors': []
+        }
+        
+        remove_iam_user.run(self.mock_args)
+        
+        output = mock_stdout.getvalue()
+        self.assertIn("[DRY RUN]", output)
+        mock_remove.assert_called_once()
+
+    @patch('inv_scr.operations.remove_iam_user.get_all_credentials')
+    @patch('inv_scr.operations.remove_iam_user._find_user_resources')
+    @patch('inv_scr.operations.remove_iam_user._remove_user_resources')
+    @patch('builtins.input', return_value='yes')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_confirmation(self, mock_stdout, mock_input, mock_remove, mock_find, mock_creds):
+        """Test run function with user confirmation"""
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-east-1', 'MgmtAccount': '123456789012',
+             'AccessKeyId': 'AKIAIOSFODNN7EXAMPLE', 'SecretAccessKey': 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+             'SessionToken': 'token123'}
+        ]
+        
+        mock_find.return_value = {
+            'found': True,
+            'account_id': '123456789012',
+            'credentials': mock_creds.return_value[0],
+            'user_details': {'UserName': 'test-user', 'UserId': 'AIDAI23HXS4EXAMPLE'},
+            'access_keys': [],
+            'mfa_devices': [],
+            'signing_certificates': [],
+            'ssh_public_keys': [],
+            'service_specific_credentials': [],
+            'login_profile': None,
+            'attached_policies': [],
+            'inline_policies': [],
+            'groups': [],
+        }
+        
+        mock_remove.return_value = {
+            'success': True,
+            'removed_resources': ['IAM User: test-user'],
+            'errors': []
+        }
+        
+        remove_iam_user.run(self.mock_args)
+        
+        mock_input.assert_called_once()
+        mock_remove.assert_called_once()
+
+    @patch('inv_scr.operations.remove_iam_user.get_all_credentials')
+    @patch('inv_scr.operations.remove_iam_user._find_user_resources')
+    @patch('inv_scr.operations.remove_iam_user._remove_user_resources')
+    @patch('builtins.input', return_value='no')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_cancelled_by_user(self, mock_stdout, mock_input, mock_remove, mock_find, mock_creds):
+        """Test run function when user cancels operation"""
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-east-1', 'MgmtAccount': '123456789012',
+             'AccessKeyId': 'AKIAIOSFODNN7EXAMPLE', 'SecretAccessKey': 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+             'SessionToken': 'token123'}
+        ]
+        
+        mock_find.return_value = {
+            'found': True,
+            'account_id': '123456789012',
+            'credentials': mock_creds.return_value[0],
+            'user_details': {'UserName': 'test-user', 'UserId': 'AIDAI23HXS4EXAMPLE'},
+            'access_keys': [],
+            'mfa_devices': [],
+            'signing_certificates': [],
+            'ssh_public_keys': [],
+            'service_specific_credentials': [],
+            'login_profile': None,
+            'attached_policies': [],
+            'inline_policies': [],
+            'groups': [],
+        }
+        
+        remove_iam_user.run(self.mock_args)
+        
+        output = mock_stdout.getvalue()
+        self.assertIn("cancelled", output)
+        mock_remove.assert_not_called()
+
+    @patch('inv_scr.operations.remove_iam_user.get_all_credentials')
+    @patch('inv_scr.operations.remove_iam_user._find_user_resources')
+    @patch('inv_scr.operations.remove_iam_user._remove_user_resources')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_run_with_force_flag(self, mock_stdout, mock_remove, mock_find, mock_creds):
+        """Test run function with force flag (no confirmation)"""
+        self.mock_args.pForce = True
+        
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-east-1', 'MgmtAccount': '123456789012',
+             'AccessKeyId': 'AKIAIOSFODNN7EXAMPLE', 'SecretAccessKey': 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+             'SessionToken': 'token123'}
+        ]
+        
+        mock_find.return_value = {
+            'found': True,
+            'account_id': '123456789012',
+            'credentials': mock_creds.return_value[0],
+            'user_details': {'UserName': 'test-user', 'UserId': 'AIDAI23HXS4EXAMPLE'},
+            'access_keys': [],
+            'mfa_devices': [],
+            'signing_certificates': [],
+            'ssh_public_keys': [],
+            'service_specific_credentials': [],
+            'login_profile': None,
+            'attached_policies': [],
+            'inline_policies': [],
+            'groups': [],
+        }
+        
+        mock_remove.return_value = {
+            'success': True,
+            'removed_resources': ['IAM User: test-user'],
+            'errors': []
+        }
+        
+        remove_iam_user.run(self.mock_args)
+        
+        mock_remove.assert_called_once()
+
+    @patch('boto3.Session')
+    def test_find_user_resources_user_found(self, mock_session):
+        """Test _find_user_resources when user is found"""
+        from botocore.exceptions import ClientError
+        
+        mock_iam_client = MagicMock()
+        mock_session.return_value.client.return_value = mock_iam_client
+        
+        # Mock IAM API responses
+        mock_iam_client.get_user.return_value = {
+            'User': {'UserName': 'test-user', 'UserId': 'AIDAI23HXS4EXAMPLE'}
+        }
+        mock_iam_client.list_access_keys.return_value = {
+            'AccessKeyMetadata': [{'AccessKeyId': 'AKIAIOSFODNN7EXAMPLE'}]
+        }
+        mock_iam_client.list_mfa_devices.return_value = {'MFADevices': []}
+        mock_iam_client.list_signing_certificates.return_value = {'Certificates': []}
+        mock_iam_client.list_ssh_public_keys.return_value = {'SSHPublicKeys': []}
+        mock_iam_client.list_service_specific_credentials.return_value = {'ServiceSpecificCredentials': []}
+        
+        # Mock NoSuchEntity error for login profile
+        error_response = {'Error': {'Code': 'NoSuchEntity', 'Message': 'Login profile not found'}}
+        mock_iam_client.get_login_profile.side_effect = ClientError(error_response, 'GetLoginProfile')
+        
+        mock_iam_client.list_attached_user_policies.return_value = {'AttachedPolicies': []}
+        mock_iam_client.list_user_policies.return_value = {'PolicyNames': []}
+        mock_iam_client.list_groups_for_user.return_value = {'Groups': []}
+        
+        credentials = [{
+            'AccountId': '123456789012',
+            'Region': 'us-east-1',
+            'MgmtAccount': '123456789012',
+            'AccessKeyId': 'AKIAIOSFODNN7EXAMPLE',
+            'SecretAccessKey': 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+            'SessionToken': 'token123',
+            'Success': True
+        }]
+        
+        result = remove_iam_user._find_user_resources(credentials, 'test-user')
+        
+        self.assertTrue(result['found'])
+        self.assertEqual(result['account_id'], '123456789012')
+        self.assertEqual(len(result['access_keys']), 1)
+
+    def test_find_user_resources_empty_credentials(self):
+        """Test _find_user_resources with empty credentials list"""
+        result = remove_iam_user._find_user_resources([], 'test-user')
+        self.assertFalse(result['found'])
+
+    @patch('boto3.Session')
+    def test_remove_user_resources_dry_run(self, mock_session):
+        """Test _remove_user_resources in dry-run mode"""
+        credentials = {
+            'AccountId': '123456789012',
+            'AccessKeyId': 'AKIAIOSFODNN7EXAMPLE',
+            'SecretAccessKey': 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+            'SessionToken': 'token123'
+        }
+        
+        user_info = {
+            'found': True,
+            'account_id': '123456789012',
+            'credentials': credentials,
+            'user_details': {'UserName': 'test-user'},
+            'access_keys': [],
+            'mfa_devices': [],
+            'signing_certificates': [],
+            'ssh_public_keys': [],
+            'service_specific_credentials': [],
+            'login_profile': None,
+            'attached_policies': [],
+            'inline_policies': [],
+            'groups': [],
+        }
+        
+        result = remove_iam_user._remove_user_resources(
+            credentials, 'test-user', user_info, dry_run=True
+        )
+        
+        self.assertTrue(result['success'])
+        self.assertEqual(len(result['removed_resources']), 0)
+        mock_session.assert_not_called()
+
+    @patch('boto3.Session')
+    def test_remove_user_resources_success(self, mock_session):
+        """Test _remove_user_resources successful removal"""
+        mock_iam_client = MagicMock()
+        mock_session.return_value.client.return_value = mock_iam_client
+        
+        credentials = {
+            'AccountId': '123456789012',
+            'AccessKeyId': 'AKIAIOSFODNN7EXAMPLE',
+            'SecretAccessKey': 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+            'SessionToken': 'token123'
+        }
+        
+        user_info = {
+            'found': True,
+            'account_id': '123456789012',
+            'credentials': credentials,
+            'user_details': {'UserName': 'test-user'},
+            'access_keys': [{'AccessKeyId': 'AKIAIOSFODNN7EXAMPLE'}],
+            'mfa_devices': [],
+            'signing_certificates': [],
+            'ssh_public_keys': [],
+            'service_specific_credentials': [],
+            'login_profile': None,
+            'attached_policies': [],
+            'inline_policies': [],
+            'groups': [],
+        }
+        
+        result = remove_iam_user._remove_user_resources(
+            credentials, 'test-user', user_info, dry_run=False
+        )
+        
+        self.assertTrue(result['success'])
+        self.assertGreater(len(result['removed_resources']), 0)
+        mock_iam_client.delete_access_key.assert_called_once()
+        mock_iam_client.delete_user.assert_called_once()
+
+
+if __name__ == '__main__':
+    unittest.main()
