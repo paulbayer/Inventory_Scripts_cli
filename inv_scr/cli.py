@@ -14,11 +14,11 @@ from inv_scr.operations import (
     ebs_volumes, ecs_clusters, elbs, enis, functions,
     gas, gd_detectors, orgs, phzs, policies, rds_instances,
     roles, saml_providers, subnets, tgws, topics, ram_shares,
-    config_recorders, cloudtrail, azs, org_users
+    config_recorders, cloudtrail, azs, org_users, remove_iam_user
 )
 
 init()
-__version__ = "2026.01.06"
+__version__ = "2026.01.28"
 
 # Available operations with metadata (alphabetically sorted)
 # Ideas for later:
@@ -107,6 +107,10 @@ OPERATIONS = {
     'rds-instances': {
         'run': rds_instances.run,
         'description': 'Find RDS database instances across AWS accounts and regions',
+    },
+    'remove-iam-user': {
+        'run': remove_iam_user.run,
+        'description': 'Remove an IAM user and all associated resources from AWS accounts',
     },
     'roles': {
         'run': roles.run,
