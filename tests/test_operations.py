@@ -958,6 +958,8 @@ class TestCfnStackSetsOperation(unittest.TestCase):
         self.mock_args.pExact = False
         self.mock_args.pStatus = 'ACTIVE'
         self.mock_args.pInstanceCount = False
+        self.mock_args.loglevel = 50  # CRITICAL - default verbose level
+        self.mock_args.pShowDate = False  # Default: don't show dates
 
     def test_add_operation_args_function_exists(self):
         """Test that add_operation_args function exists"""
@@ -1007,6 +1009,78 @@ class TestCfnStackSetsOperation(unittest.TestCase):
         # Check output contains expected text
         output = mock_stdout.getvalue()
         self.assertIn("Searching for CloudFormation StackSets", output)
+
+    @patch('inv_scr.operations.cfnstacksets.get_all_credentials')
+    @patch('inv_scr.operations.cfnstacksets.find_all_cfnstacksets')
+    @patch('inv_scr.operations.cfnstacksets.display_results')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_verbose_level_3_enables_instance_count(self, mock_stdout, mock_display, mock_find, mock_creds):
+        """Test that -vvv (loglevel 20) automatically enables instance count"""
+        # Set verbose level 3 (INFO = 20)
+        self.mock_args.loglevel = 20
+        
+        # Mock credentials
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-east-1', 'MgmtAccount': '123456789012'}
+        ]
+        
+        # Mock stacksets found
+        mock_find.return_value = [
+            {
+                'MgmtAccount': '123456789012',
+                'AccountId': '123456789012',
+                'Region': 'us-east-1',
+                'StackSetName': 'test-stackset',
+                'Status': 'ACTIVE',
+                'InstanceNum': 5,
+                'ParentProfile': 'test-profile'
+            }
+        ]
+        
+        cfnstacksets.run(self.mock_args)
+        
+        # Verify find_all_cfnstacksets was called with fInstanceCount=True
+        call_args = mock_find.call_args
+        self.assertTrue(call_args[1].get('fInstanceCount') or call_args[1].get('fGetInstances'),
+                       "Instance count should be enabled when loglevel <= 20")
+
+    @patch('inv_scr.operations.cfnstacksets.get_all_credentials')
+    @patch('inv_scr.operations.cfnstacksets.find_all_cfnstacksets')
+    @patch('inv_scr.operations.cfnstacksets.display_stackset_health')
+    @patch('sys.stdout', new_callable=io.StringIO)
+    def test_date_flag_triggers_health_display(self, mock_stdout, mock_health, mock_find, mock_creds):
+        """Test that --date flag triggers display_stackset_health instead of display_results"""
+        # Enable date display
+        self.mock_args.pShowDate = True
+        
+        # Mock credentials
+        mock_creds.return_value = [
+            {'AccountId': '123456789012', 'Region': 'us-east-1', 'MgmtAccount': '123456789012'}
+        ]
+        
+        # Mock stacksets with instance data
+        mock_find.return_value = [
+            {
+                'ParentAccountNumber': '123456789012',
+                'ChildAccount': '123456789012',
+                'ChildRegion': 'us-east-1',
+                'StackStatus': 'CURRENT',
+                'StackSetName': 'test-stackset',
+                'PermissionModel': 'SELF_MANAGED',
+                'ParentProfile': 'test-profile',
+                'Region': 'us-east-1'
+            }
+        ]
+        
+        cfnstacksets.run(self.mock_args)
+        
+        # Verify display_stackset_health was called (not display_results)
+        mock_health.assert_called_once()
+        
+        # Verify fGetInstances=True was passed to find_all_cfnstacksets
+        call_args = mock_find.call_args
+        self.assertTrue(call_args[1].get('fGetInstances'),
+                       "fGetInstances should be True when --date is specified")
 
 
 class TestEbsVolumesOperation(unittest.TestCase):

@@ -46,7 +46,7 @@ from inv_scr.core.Inventory_Modules import (
     display_results,
 )
 
-__version__ = "2026.01.28"
+__version__ = "2026.02.03"
 
 
 def add_operation_args(parser):
@@ -58,7 +58,7 @@ def add_operation_args(parser):
     """
     local = parser.my_parser.add_argument_group('remove-iam-user', 'Remove IAM user options')
     local.add_argument(
-        "+username",
+        "+username", "+user-name",
         dest="pUsername",
         metavar="USERNAME",
         help="IAM username to remove (required)",
@@ -85,34 +85,20 @@ def add_operation_args(parser):
 def _find_user_resources(
     credentials: List[Dict[str, Any]],
     username: str,
-) -> Dict[str, Any]:
+) -> List[Dict[str, Any]]:
     """
-    Find all resources associated with an IAM user.
+    Find all instances of an IAM user across all accounts.
     
     Args:
         credentials: List of credential dictionaries for AWS accounts
         username: IAM username to search for
     
     Returns:
-        Dictionary containing user information and associated resources
+        List of dictionaries, each containing user information and associated resources for one account
     """
     import boto3
     
-    user_info = {
-        'found': False,
-        'account_id': None,
-        'credentials': None,
-        'user_details': None,
-        'access_keys': [],
-        'mfa_devices': [],
-        'signing_certificates': [],
-        'ssh_public_keys': [],
-        'service_specific_credentials': [],
-        'login_profile': None,
-        'attached_policies': [],
-        'inline_policies': [],
-        'groups': [],
-    }
+    found_users = []
     
     logging.info(f"Searching for user '{username}' across accounts...")
     
@@ -143,10 +129,23 @@ def _find_user_resources(
             # Try to get the user
             try:
                 user_response = client_iam.get_user(UserName=username)
-                user_info['found'] = True
-                user_info['account_id'] = cred['AccountId']
-                user_info['credentials'] = cred
-                user_info['user_details'] = user_response['User']
+                
+                user_info = {
+                    'found': True,
+                    'account_id': cred['AccountId'],
+                    'mgmt_account': cred.get('MgmtAccount', cred['AccountId']),
+                    'credentials': cred,
+                    'user_details': user_response['User'],
+                    'access_keys': [],
+                    'mfa_devices': [],
+                    'signing_certificates': [],
+                    'ssh_public_keys': [],
+                    'service_specific_credentials': [],
+                    'login_profile': None,
+                    'attached_policies': [],
+                    'inline_policies': [],
+                    'groups': [],
+                }
                 
                 logging.info(f"Found user '{username}' in account {cred['AccountId']}")
                 
@@ -214,8 +213,8 @@ def _find_user_resources(
                 except ClientError as e:
                     logging.warning(f"Could not list groups: {e}")
                 
-                # User found, stop searching
-                break
+                # Add this user instance to the list
+                found_users.append(user_info)
                 
             except ClientError as e:
                 if e.response['Error']['Code'] == 'NoSuchEntity':
@@ -227,7 +226,7 @@ def _find_user_resources(
         except ClientError as e:
             logging.error(f"Error accessing account {cred['AccountId']}: {e}")
     
-    return user_info
+    return found_users
 
 
 def _remove_user_resources(
@@ -476,79 +475,156 @@ def run(args):
             f"Credential setup for {AccountNum} accounts",
         )
 
-    # Find the user and their resources
-    user_info = _find_user_resources(CredentialList, pUsername)
+    # Find the user and their resources across all accounts
+    found_users = _find_user_resources(CredentialList, pUsername)
 
     if timing:
         timing.milestone("user_search", "User search completed")
 
-    if not user_info['found']:
+    if not found_users:
         print(f"\nUser '{pUsername}' not found in any accessible accounts")
         return
 
-    # Display what will be removed
-    print(f"\nFound user '{pUsername}' in account {user_info['account_id']}")
-    print("\nResources to be removed:")
-    print(f"  - User: {pUsername}")
+    # Display all found instances of the user
+    print(f"\nFound user '{pUsername}' in {len(found_users)} account(s):")
+    print("=" * 80)
     
-    if user_info['access_keys']:
-        print(f"  - Access Keys: {len(user_info['access_keys'])}")
-    if user_info['mfa_devices']:
-        print(f"  - MFA Devices: {len(user_info['mfa_devices'])}")
-    if user_info['signing_certificates']:
-        print(f"  - Signing Certificates: {len(user_info['signing_certificates'])}")
-    if user_info['ssh_public_keys']:
-        print(f"  - SSH Public Keys: {len(user_info['ssh_public_keys'])}")
-    if user_info['service_specific_credentials']:
-        print(f"  - Service Specific Credentials: {len(user_info['service_specific_credentials'])}")
-    if user_info['login_profile']:
-        print(f"  - Console Password: Yes")
-    if user_info['attached_policies']:
-        print(f"  - Attached Policies: {len(user_info['attached_policies'])}")
-    if user_info['inline_policies']:
-        print(f"  - Inline Policies: {len(user_info['inline_policies'])}")
-    if user_info['groups']:
-        print(f"  - Group Memberships: {len(user_info['groups'])}")
+    for idx, user_info in enumerate(found_users, 1):
+        print(f"\n{idx}. Account: {user_info['account_id']} (Mgmt Account: {user_info['mgmt_account']})")
+        print(f"   User ID: {user_info['user_details'].get('UserId', 'N/A')}")
+        print(f"   Created: {user_info['user_details'].get('CreateDate', 'N/A')}")
+        
+        # Count resources
+        resource_count = 0
+        resource_details = []
+        
+        if user_info['access_keys']:
+            count = len(user_info['access_keys'])
+            resource_count += count
+            resource_details.append(f"Access Keys: {count}")
+        
+        if user_info['mfa_devices']:
+            count = len(user_info['mfa_devices'])
+            resource_count += count
+            resource_details.append(f"MFA Devices: {count}")
+        
+        if user_info['signing_certificates']:
+            count = len(user_info['signing_certificates'])
+            resource_count += count
+            resource_details.append(f"Signing Certificates: {count}")
+        
+        if user_info['ssh_public_keys']:
+            count = len(user_info['ssh_public_keys'])
+            resource_count += count
+            resource_details.append(f"SSH Keys: {count}")
+        
+        if user_info['service_specific_credentials']:
+            count = len(user_info['service_specific_credentials'])
+            resource_count += count
+            resource_details.append(f"Service Credentials: {count}")
+        
+        if user_info['login_profile']:
+            resource_count += 1
+            resource_details.append("Console Password: Yes")
+        
+        if user_info['attached_policies']:
+            count = len(user_info['attached_policies'])
+            resource_count += count
+            resource_details.append(f"Attached Policies: {count}")
+        
+        if user_info['inline_policies']:
+            count = len(user_info['inline_policies'])
+            resource_count += count
+            resource_details.append(f"Inline Policies: {count}")
+        
+        if user_info['groups']:
+            count = len(user_info['groups'])
+            resource_count += count
+            resource_details.append(f"Group Memberships: {count}")
+        
+        print(f"   Total Resources: {resource_count}")
+        if resource_details:
+            print(f"   Resources: {', '.join(resource_details)}")
+
+    print("\n" + "=" * 80)
+    print(f"\nTotal: {len(found_users)} user instance(s) found across {AccountNum} accounts")
+    
+    # In dry-run mode, just show what would be done
+    if pDryRun:
+        print("\n[DRY RUN] No changes will be made")
+        return
 
     # Confirm removal unless force flag is set
-    if not pForce and not pDryRun:
-        response = input(f"\nAre you sure you want to remove user '{pUsername}' and all associated resources? (yes/no): ")
-        if response.lower() not in ['yes', 'y']:
+    if not pForce:
+        print(f"\nThis will remove user '{pUsername}' from ALL {len(found_users)} account(s) listed above.")
+        response = input(f"Are you sure you want to proceed? (yes/no): ")
+        if response.lower() != 'yes':
             print("Operation cancelled")
             return
 
     if timing:
         timing.milestone("confirmation", "User confirmation received")
 
-    # Perform the removal
-    removal_results = _remove_user_resources(
-        user_info['credentials'],
-        pUsername,
-        user_info,
-        pDryRun
-    )
+    # Remove the user from each account
+    print(f"\nRemoving user '{pUsername}' from {len(found_users)} account(s)...")
+    
+    all_results = []
+    for idx, user_info in enumerate(found_users, 1):
+        print(f"\n[{idx}/{len(found_users)}] Processing account {user_info['account_id']}...")
+        
+        removal_results = _remove_user_resources(
+            user_info['credentials'],
+            pUsername,
+            user_info,
+            pDryRun
+        )
+        
+        removal_results['account_id'] = user_info['account_id']
+        all_results.append(removal_results)
     
     if timing:
         timing.milestone("removal_complete", "User removal completed")
 
-    # Display results
-    print(f"\n{'[DRY RUN] ' if pDryRun else ''}Removal Results:")
-    print("=" * 50)
+    # Display consolidated results
+    print("\n" + "=" * 80)
+    print("REMOVAL SUMMARY")
+    print("=" * 80)
     
-    if removal_results['removed_resources']:
-        print(f"\nSuccessfully removed {len(removal_results['removed_resources'])} resource(s):")
-        for resource in removal_results['removed_resources']:
-            print(f"  ✓ {resource}")
+    total_removed = 0
+    total_errors = 0
+    successful_accounts = []
+    failed_accounts = []
     
-    if removal_results['errors']:
-        print(f"\nEncountered {len(removal_results['errors'])} error(s):")
-        for error in removal_results['errors']:
-            print(f"  ✗ {error}")
+    for result in all_results:
+        account_id = result['account_id']
+        
+        if result['success']:
+            successful_accounts.append(account_id)
+            total_removed += len(result['removed_resources'])
+        else:
+            failed_accounts.append(account_id)
+        
+        total_errors += len(result['errors'])
+        
+        print(f"\nAccount {account_id}:")
+        if result['removed_resources']:
+            print(f"  ✓ Removed {len(result['removed_resources'])} resource(s)")
+            for resource in result['removed_resources']:
+                print(f"    - {resource}")
+        
+        if result['errors']:
+            print(f"  ✗ {len(result['errors'])} error(s)")
+            for error in result['errors']:
+                print(f"    - {error}")
     
-    if removal_results['success']:
-        print(f"\n{'[DRY RUN] ' if pDryRun else ''}Successfully removed user '{pUsername}'")
-    else:
-        print(f"\n{'[DRY RUN] ' if pDryRun else ''}Failed to completely remove user '{pUsername}'")
-        print("Some resources may still exist. Check errors above.")
+    print("\n" + "=" * 80)
+    print(f"Successfully removed from {len(successful_accounts)} account(s): {', '.join(successful_accounts)}")
     
-    print(f"\n{'[DRY RUN] ' if pDryRun else ''}Operation completed")
+    if failed_accounts:
+        print(f"Failed to remove from {len(failed_accounts)} account(s): {', '.join(failed_accounts)}")
+    
+    print(f"Total resources removed: {total_removed}")
+    if total_errors > 0:
+        print(f"Total errors encountered: {total_errors}")
+    
+    print(f"\nOperation completed")
