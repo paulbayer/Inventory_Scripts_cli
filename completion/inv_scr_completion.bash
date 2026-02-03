@@ -11,7 +11,7 @@ _inv_scr_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
     
     # Available operations
-    operations="azs cfnstacks cfnstacksets cloudtrail config-recorders directories ebs-volumes ecs-clusters elbs enis functions gas gd-detectors instances list org-users orgs phzs policies ram-shares rds-instances roles saml-providers subnets tgws topics vpcs"
+    operations="azs cfnstacks cfnstacksets cloudtrail config-recorders directories ebs-volumes ecs-clusters elbs enis functions gas gd-detectors instances list org-users orgs phzs policies ram-shares rds-instances remove-iam-user roles saml-providers subnets tgws topics vpcs"
     
     # Common options
     common_opts="--profiles --regions --role-to-use --root-only --save-to-file --timing --verbose --quiet --version --help"
