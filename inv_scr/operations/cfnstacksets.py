@@ -17,7 +17,7 @@ from inv_scr.core.Inventory_Modules import (
 )
 
 init()
-__version__ = "2026.01.20"
+__version__ = "2026.02.03"
 ERASE_LINE = '\x1b[2K'
 SLEEP_INTERVAL = 5
 
@@ -668,6 +668,11 @@ def run(args):
     pStatus = getattr(args, 'pStatus', 'ACTIVE')
     pInstanceCount = getattr(args, 'pInstanceCount', False)
     
+    # Auto-enable instances flag when verbose level 3 (-vvv) is used
+    if hasattr(args, 'loglevel') and args.loglevel <= 20:  # INFO level or more verbose
+        pInstanceCount = True
+        logging.info("Auto-enabling instance count display due to verbose level")
+    
     # New modification arguments
     pDelete = getattr(args, 'pDelete', False)
     pAdd = getattr(args, 'pAdd', False)
@@ -724,8 +729,8 @@ def run(args):
     if timing:
         timing.milestone("credentials_setup", f"Credential setup for {AccountNum} accounts across {RegionNum} regions")
     
-    # Find all stacksets with detailed instance information if modifying
-    get_instances = changes_requested or pCheckAccounts
+    # Find all stacksets with detailed instance information if modifying or showing dates
+    get_instances = changes_requested or pCheckAccounts or pShowDate
     AllStackSets = find_all_cfnstacksets(CredentialList, pFragments, pStatus, 
                                         fInstanceCount=pInstanceCount and not get_instances,
                                         fGetInstances=get_instances)

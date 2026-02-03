@@ -11,7 +11,7 @@ from inv_scr.core import Inventory_Modules
 from inv_scr.core.Inventory_Modules import get_profiles, get_org_accounts_from_profiles, display_results
 
 init()
-__version__ = "2025.07.10"
+__version__ = "2026.02.03"
 
 class OrgsFound:
     """Class to hold organization discovery results"""
@@ -140,7 +140,7 @@ def find_all_orgs(pProfiles: list, pSkipProfiles: list, pAccountList: list, pTim
 
         # Display results on screen
         if pFilename is None:
-            fmt = '%-23s %-15s'
+            fmt = f'%-{ProfileNameLength+1}s %-15s'
             print()
             print(fmt % ("Organization's Profile", "Root Account"))
             print(fmt % ("----------------------", "------------"))

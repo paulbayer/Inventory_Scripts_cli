@@ -32,6 +32,7 @@ Do not read the following unless specifically requested:
 - Python 3, 4-space indentation; prefer type hints and small, testable functions.
 - Use `snake_case` for modules/functions/vars, `PascalCase` for classes, `UPPER_SNAKE_CASE` for constants.
 - New operations belong in `inv_scr/operations/<resource>.py`; implement `add_operation_args` + `run` and register in `OPERATIONS` in `inv_scr/cli.py`.
+- When adding a new operation, also update the bash completion script at `completion/inv_scr_completion.bash` by adding the operation name to the `operations` variable (line 13).
 - Reuse `inv_scr/core/ArgumentsClass.py` helpers; keep logging through the standard `logging` module and match existing formatter.
 - Read-only functionality should correlate to parameters that are prepended with a dash ("-"), while functionality that might be intrusive or make changes should be prepended with a plus ("+").
 - All functions must include docstrings with a brief description, `Args:` section documenting each parameter, and `Returns:` section describing the return value structure.

@@ -17,7 +17,7 @@ from inv_scr.core import Inventory_Modules
 from inv_scr.core.Inventory_Modules import get_all_credentials, display_results, find_lambda_functions2
 
 init()
-__version__ = "2026.01.08"
+__version__ = "2026.02.03"
 
 ERASE_LINE = '\x1b[2K'
 

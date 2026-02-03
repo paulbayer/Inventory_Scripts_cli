@@ -1,6 +1,6 @@
 import logging
 
-__version__ = "2026.01.06"
+__version__ = "2026.02.03"
 
 """
 ** Why are some functions "function" vs. "function2" vs. "function3"?**
@@ -4790,7 +4790,24 @@ def display_results(results_list, fdisplay_dict: dict, defaultAction=None, file_
 
 		# This writes out the data
 		for result in results_list:
+			# Check if any field in this row matches a condition (for full-line highlighting)
+			highlight_row = False
+			for field, value in sorted_display_dict.items():
+				if 'Condition' in value and field in result.keys():
+					condition_type = value.get('ConditionType', 'equals')  # Default to 'equals' for backward compatibility
+					if condition_type == 'equals':
+						if result[field] in value['Condition']:
+							highlight_row = True
+							break
+					elif condition_type == 'not_equals':
+						if result[field] not in value['Condition']:
+							highlight_row = True
+							break
+			
+			# Start the row with highlighting if needed
 			print("\t", end='') if subdisplay else None
+			print(f"{Fore.RED if highlight_row else ''}", end='')
+			
 			for field, value in sorted_display_dict.items():
 				# This determines whether ths row provided is supposed to be displayed as a sub-report of the main row
 				if 'SubDisplay' in value.keys():
@@ -4801,16 +4818,6 @@ def display_results(results_list, fdisplay_dict: dict, defaultAction=None, file_
 				data_format = needed_space[field]
 				if field not in result.keys():
 					result[field] = defaultAction
-				# This allows for a condition to highlight a specific value
-				highlight = False
-				if 'Condition' in value:
-					condition_type = value.get('ConditionType', 'equals')  # Default to 'equals' for backward compatibility
-					if condition_type == 'equals':
-						highlight = result[field] in value['Condition']
-					elif condition_type == 'not_equals':
-						highlight = result[field] not in value['Condition']
-				# TODO: This highlights only the specific field that was matched. Thinking about whether it's better to highlight the whole line.
-				print(f"{Fore.RED if highlight else ''}", end='')
 				if result[field] is None:
 					print(f"{'':{data_format}} ", end='')
 				elif isinstance(result[field], str):
@@ -4850,7 +4857,8 @@ def display_results(results_list, fdisplay_dict: dict, defaultAction=None, file_
 								print(f"{item['PrefixListId']}", end='')
 						else:
 							print(f"{item}", end='')
-				print(f"{Fore.RESET if highlight else ''}", end='')
+			# Reset color at end of row if it was highlighted
+			print(f"{Fore.RESET if highlight_row else ''}", end='')
 			print()  # This is the end of line character needed at the end of every line
 		print()  # This is the new line needed at the end of the script.
 		# TODO: We need to add some analytics here... Trying to come up with what would make sense across all displays.
