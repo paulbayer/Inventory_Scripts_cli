@@ -3,6 +3,8 @@
 Remove IAM user operation
 Removes IAM users from AWS accounts with proper cleanup of associated resources
 
+## TODO: Consider updating this tool to remove Identity Center users as well
+
 This operation performs a comprehensive cleanup of an IAM user including:
 - Access keys (all keys are deleted)
 - MFA devices (deactivated and deleted)
@@ -46,7 +48,7 @@ from inv_scr.core.Inventory_Modules import (
     display_results,
 )
 
-__version__ = "2026.02.03"
+__version__ = "2026.02.04"
 
 
 def add_operation_args(parser):
