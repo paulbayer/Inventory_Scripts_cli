@@ -24,6 +24,9 @@ Superseded
 ai_docs/
 ai_bin/
 
+# Ignore test output files in operations directory
+inv_scr/operations/*.txt
+
 # Old directories and their contents
 #old/*
 #*/old/*
