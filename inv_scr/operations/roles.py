@@ -9,7 +9,7 @@ from botocore.exceptions import ClientError
 from inv_scr.core import Inventory_Modules
 from inv_scr.core.Inventory_Modules import get_all_credentials, display_results, find_in
 
-__version__ = "2025.07.11"
+__version__ = "2026.02.04"
 
 def add_operation_args(parser):
     """Add operation-specific arguments"""
@@ -29,14 +29,29 @@ def add_operation_args(parser):
         help="Look for exact match of fragment, instead of substring"
     )
     local.add_argument(
+        "--last-used",
+        dest="pLastUsed",
+        action="store_true",
+        help="Include last used date and region for each role (requires additional API calls)"
+    )
+    local.add_argument(
         "--operation-version",
         action="version",
         version=f"IAM Roles operation version {__version__}"
     )
 
-def find_all_roles(fAllCredentials: list, frole_fragments: list = None, fexact: bool = False) -> list:
+def find_all_roles(fAllCredentials: list, frole_fragments: list = None, fexact: bool = False, finclude_last_used: bool = False) -> list:
     """
     Find all IAM roles from all accounts within the credentials supplied
+    
+    Args:
+        fAllCredentials: List of credential dictionaries for AWS accounts
+        frole_fragments: Optional list of role name fragments to filter by
+        fexact: If True, match fragments exactly instead of substring matching
+        finclude_last_used: If True, fetch last used date/region for each role (slower)
+    
+    Returns:
+        List of dictionaries containing role information
     """
     AllRoles = []
     
@@ -47,6 +62,9 @@ def find_all_roles(fAllCredentials: list, frole_fragments: list = None, fexact: 
         print(f"Looking for a role exactly named one of these strings {frole_fragments} across {len(fAllCredentials)} accounts")
     else:
         print(f"Looking for a role containing one of these strings {frole_fragments} across {len(fAllCredentials)} accounts")
+    
+    if finclude_last_used:
+        print("Including last used information (this will take longer)")
     print()
 
     for account in tqdm(fAllCredentials, desc="Processing accounts", unit="accounts"):
@@ -67,7 +85,7 @@ def find_all_roles(fAllCredentials: list, frole_fragments: list = None, fexact: 
             
             for page in paginator.paginate():
                 for role in page['Roles']:
-                    AllRoles.append({
+                    role_data = {
                         'MgmtAccount': account['MgmtAccount'],
                         'AccountId': account['AccountId'],
                         'Region': account['Region'],
@@ -77,7 +95,21 @@ def find_all_roles(fAllCredentials: list, frole_fragments: list = None, fexact: 
                         'AssumeRolePolicyDocument': role.get('AssumeRolePolicyDocument', ''),
                         'Path': role.get('Path', '/'),
                         'MaxSessionDuration': role.get('MaxSessionDuration', 3600)
-                    })
+                    }
+                    
+                    # Fetch last used information if requested
+                    if finclude_last_used:
+                        try:
+                            role_details = iam_client.get_role(RoleName=role['RoleName'])
+                            role_last_used = role_details.get('Role', {}).get('RoleLastUsed', {})
+                            role_data['LastUsedDate'] = role_last_used.get('LastUsedDate', 'Never')
+                            role_data['LastUsedRegion'] = role_last_used.get('Region', 'N/A')
+                        except ClientError as e:
+                            logging.warning(f"Could not get last used info for role {role['RoleName']}: {e}")
+                            role_data['LastUsedDate'] = 'Error'
+                            role_data['LastUsedRegion'] = 'N/A'
+                    
+                    AllRoles.append(role_data)
                     
         except ClientError as my_Error:
             if "AuthFailure" in str(my_Error):
@@ -96,7 +128,15 @@ def find_all_roles(fAllCredentials: list, frole_fragments: list = None, fexact: 
     return found_roles
 
 def run(args):
-    """Main execution function for roles operation"""
+    """
+    Main execution function for roles operation
+    
+    Args:
+        args: Parsed command-line arguments containing operation parameters
+    
+    Returns:
+        None (outputs results to console or file)
+    """
     # Get timing context from CLI (if available)
     timing = getattr(args, '_timing_context', None)
     
@@ -108,6 +148,7 @@ def run(args):
     pSkipProfiles = args.SkipProfiles
     pFragments = getattr(args, 'pFragments', None)
     pExact = getattr(args, 'pExact', False)
+    pLastUsed = getattr(args, 'pLastUsed', False)
     pRootOnly = args.RootOnly
     pFilename = args.Filename
     pTiming = args.Time
@@ -132,12 +173,12 @@ def run(args):
         timing.milestone("credentials_setup", f"Credential setup for {AccountNum} accounts")
     
     # Find all roles
-    AllRoles = find_all_roles(CredentialList, pFragments, pExact)
+    AllRoles = find_all_roles(CredentialList, pFragments, pExact, pLastUsed)
     
     if timing:
         timing.milestone("roles_found", f"Found {len(AllRoles)} roles")
     
-    # Display results
+    # Display results - base columns
     display_dict = {
         'ParentProfile': {'DisplayOrder': 1, 'Heading': 'Parent Profile'},
         'MgmtAccount': {'DisplayOrder': 2, 'Heading': 'Parent Acct'},
@@ -147,6 +188,11 @@ def run(args):
         'CreateDate': {'DisplayOrder': 6, 'Heading': 'Created'},
         'MaxSessionDuration': {'DisplayOrder': 7, 'Heading': 'Max Session (sec)'}
     }
+    
+    # Add last used columns if requested
+    if pLastUsed:
+        display_dict['LastUsedDate'] = {'DisplayOrder': 8, 'Heading': 'Last Used Date'}
+        display_dict['LastUsedRegion'] = {'DisplayOrder': 9, 'Heading': 'Last Used Region'}
 
     sorted_roles = sorted(AllRoles, key=lambda d: (
         d['ParentProfile'], d['MgmtAccount'], d['AccountId'], d['RoleName']
