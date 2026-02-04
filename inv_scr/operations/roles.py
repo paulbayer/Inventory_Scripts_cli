@@ -11,6 +11,9 @@ from inv_scr.core.Inventory_Modules import get_all_credentials, display_results,
 
 __version__ = "2026.02.04"
 
+# Service role path patterns to skip when --skip-service-roles is used
+SERVICE_ROLE_PATTERNS = ['service-role', 'aws-service-role', 'aws-reserved']
+
 def add_operation_args(parser):
     """Add operation-specific arguments"""
     local = parser.my_parser.add_argument_group('roles', 'IAM Roles specific options')
@@ -35,12 +38,18 @@ def add_operation_args(parser):
         help="Include last used date and region for each role (requires additional API calls)"
     )
     local.add_argument(
+        "--skip-service-roles",
+        dest="pSkipServiceRoles",
+        action="store_true",
+        help="Skip AWS service roles (paths containing 'service-role' or 'aws-service-role')"
+    )
+    local.add_argument(
         "--operation-version",
         action="version",
         version=f"IAM Roles operation version {__version__}"
     )
 
-def find_all_roles(fAllCredentials: list, frole_fragments: list = None, fexact: bool = False, finclude_last_used: bool = False) -> list:
+def find_all_roles(fAllCredentials: list, frole_fragments: list = None, fexact: bool = False, finclude_last_used: bool = False, fskip_service_roles: bool = False) -> list:
     """
     Find all IAM roles from all accounts within the credentials supplied
     
@@ -49,6 +58,7 @@ def find_all_roles(fAllCredentials: list, frole_fragments: list = None, fexact: 
         frole_fragments: Optional list of role name fragments to filter by
         fexact: If True, match fragments exactly instead of substring matching
         finclude_last_used: If True, fetch last used date/region for each role (slower)
+        fskip_service_roles: If True, skip roles with paths containing 'service-role' or 'aws-service-role'
     
     Returns:
         List of dictionaries containing role information
@@ -65,6 +75,8 @@ def find_all_roles(fAllCredentials: list, frole_fragments: list = None, fexact: 
     
     if finclude_last_used:
         print("Including last used information (this will take longer)")
+    if fskip_service_roles:
+        print("Skipping AWS service roles")
     print()
 
     for account in tqdm(fAllCredentials, desc="Processing accounts", unit="accounts"):
@@ -85,6 +97,13 @@ def find_all_roles(fAllCredentials: list, frole_fragments: list = None, fexact: 
             
             for page in paginator.paginate():
                 for role in page['Roles']:
+                    role_path = role.get('Path', '/')
+                    
+                    # Skip service roles if requested
+                    if fskip_service_roles:
+                        if any(pattern in role_path.lower() for pattern in SERVICE_ROLE_PATTERNS):
+                            continue
+                    
                     role_data = {
                         'MgmtAccount': account['MgmtAccount'],
                         'AccountId': account['AccountId'],
@@ -93,7 +112,7 @@ def find_all_roles(fAllCredentials: list, frole_fragments: list = None, fexact: 
                         'RoleName': role['RoleName'],
                         'CreateDate': role.get('CreateDate', ''),
                         'AssumeRolePolicyDocument': role.get('AssumeRolePolicyDocument', ''),
-                        'Path': role.get('Path', '/'),
+                        'Path': role_path,
                         'MaxSessionDuration': role.get('MaxSessionDuration', 3600)
                     }
                     
@@ -102,7 +121,7 @@ def find_all_roles(fAllCredentials: list, frole_fragments: list = None, fexact: 
                         try:
                             role_details = iam_client.get_role(RoleName=role['RoleName'])
                             role_last_used = role_details.get('Role', {}).get('RoleLastUsed', {})
-                            role_data['LastUsedDate'] = role_last_used.get('LastUsedDate', 'Never')
+                            role_data['LastUsedDate'] = role_last_used.get('LastUsedDate', 'Not in last 400 days')
                             role_data['LastUsedRegion'] = role_last_used.get('Region', 'N/A')
                         except ClientError as e:
                             logging.warning(f"Could not get last used info for role {role['RoleName']}: {e}")
@@ -149,6 +168,7 @@ def run(args):
     pFragments = getattr(args, 'pFragments', None)
     pExact = getattr(args, 'pExact', False)
     pLastUsed = getattr(args, 'pLastUsed', False)
+    pSkipServiceRoles = getattr(args, 'pSkipServiceRoles', False)
     pRootOnly = args.RootOnly
     pFilename = args.Filename
     pTiming = args.Time
@@ -173,7 +193,7 @@ def run(args):
         timing.milestone("credentials_setup", f"Credential setup for {AccountNum} accounts")
     
     # Find all roles
-    AllRoles = find_all_roles(CredentialList, pFragments, pExact, pLastUsed)
+    AllRoles = find_all_roles(CredentialList, pFragments, pExact, pLastUsed, pSkipServiceRoles)
     
     if timing:
         timing.milestone("roles_found", f"Found {len(AllRoles)} roles")
