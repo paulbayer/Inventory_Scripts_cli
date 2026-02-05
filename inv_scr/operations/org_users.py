@@ -20,7 +20,7 @@ from inv_scr.core.Inventory_Modules import (
     find_idc_directory_id2,
 )
 
-__version__ = "2026.01.27"
+__version__ = "2026.02.05"
 
 
 def add_operation_args(parser):
@@ -80,6 +80,7 @@ def _find_all_org_users(
                     for user in iam_users:
                         users.append(
                             {
+                                'ParentProfile': cred.get('ParentProfile', 'Unknown'),
                                 'MgmtAccount': cred['MgmtAccount'],
                                 'AccountId': cred['AccountId'],
                                 'Region': cred['Region'],
@@ -107,6 +108,7 @@ def _find_all_org_users(
                     for user in idc_users:
                         users.append(
                             {
+                                'ParentProfile': cred.get('ParentProfile', 'Unknown'),
                                 'MgmtAccount': cred['MgmtAccount'],
                                 'AccountId': cred['AccountId'],
                                 'Region': cred['Region'],
@@ -179,17 +181,18 @@ def run(args):
         timing.milestone("users_found", f"Found {len(user_list)} users")
 
     display_dict = {
-        'MgmtAccount': {'DisplayOrder': 1, 'Heading': 'Mgmt Acct'},
-        'AccountId': {'DisplayOrder': 2, 'Heading': 'Acct Number'},
-        'Region': {'DisplayOrder': 3, 'Heading': 'Region'},
-        'UserName': {'DisplayOrder': 4, 'Heading': 'User Name'},
-        'PasswordLastUsed': {'DisplayOrder': 5, 'Heading': 'Last Used'},
-        'Type': {'DisplayOrder': 6, 'Heading': 'Source'},
+        'ParentProfile': {'DisplayOrder': 1, 'Heading': 'Parent Profile'},
+        'MgmtAccount': {'DisplayOrder': 2, 'Heading': 'Mgmt Acct'},
+        'AccountId': {'DisplayOrder': 3, 'Heading': 'Acct Number'},
+        'Region': {'DisplayOrder': 4, 'Heading': 'Region'},
+        'UserName': {'DisplayOrder': 5, 'Heading': 'User Name'},
+        'PasswordLastUsed': {'DisplayOrder': 6, 'Heading': 'Last Used'},
+        'Type': {'DisplayOrder': 7, 'Heading': 'Source'},
     }
 
     sorted_users = sorted(
         user_list,
-        key=lambda k: (k['MgmtAccount'], k['AccountId'], k['Region'], k['UserName']),
+        key=lambda k: (k['ParentProfile'], k['MgmtAccount'], k['AccountId'], k['Region'], k['UserName']),
     )
 
     display_results(sorted_users, display_dict, None, pFilename)

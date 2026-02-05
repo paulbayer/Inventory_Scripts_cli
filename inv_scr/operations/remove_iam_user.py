@@ -38,6 +38,7 @@ Usage examples:
 import logging
 import boto3
 from typing import List, Dict, Any
+from colorama import Fore, init
 
 from tqdm.auto import tqdm
 from botocore.exceptions import ClientError
@@ -48,8 +49,8 @@ from inv_scr.core.Inventory_Modules import (
     display_results,
 )
 
-__version__ = "2026.02.04"
-
+__version__ = "2026.02.05"
+init()
 
 def add_operation_args(parser):
     """
@@ -560,8 +561,8 @@ def run(args):
     if not pForce:
         print(f"\nThis will remove user '{pUsername}' from ALL {len(found_users)} account(s) listed above.")
         response = input(f"Are you sure you want to proceed? (yes/no): ")
-        if response.lower() != 'yes':
-            print("Operation cancelled")
+        if response.lower() not in ['yes', 'y']:
+            print(f"{Fore.RED}Operation cancelled{Fore.RESET}")
             return
 
     if timing:
@@ -629,4 +630,4 @@ def run(args):
     if total_errors > 0:
         print(f"Total errors encountered: {total_errors}")
     
-    print(f"\nOperation completed")
+    print(f"\nIAM User Removal operation completed")
